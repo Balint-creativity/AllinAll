@@ -1,0 +1,1685 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NOVA VANGUARD: A Kvantum Flotta</title>
+    <style>
+        :root {
+            --bg-deep: #04060f;
+            --panel-bg: rgba(12, 18, 38, 0.92);
+            --cyan: #00f0ff;
+            --cyan-glow: rgba(0, 240, 255, 0.45);
+            --orange: #ff8c00;
+            --purple: #b829ff;
+            --green: #00e676;
+            --red: #ff2a54;
+            --text: #eef6ff;
+            --muted: #8a9bb8;
+            --font: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            background: var(--bg-deep);
+            color: var(--text);
+            font-family: var(--font);
+            overflow: hidden;
+            position: fixed;
+            touch-action: none;
+        }
+
+        #gameCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            display: block;
+            cursor: crosshair;
+        }
+
+        /* Felső HUD */
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 12px 18px;
+            display: none;
+            justify-content: space-between;
+            align-items: flex-start;
+            z-index: 10;
+            pointer-events: none;
+            gap: 12px;
+        }
+
+        .hud-left, .hud-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            pointer-events: auto;
+            flex-wrap: wrap;
+        }
+
+        .hud-card {
+            background: rgba(8, 14, 30, 0.85);
+            border: 1px solid rgba(0, 240, 255, 0.35);
+            border-radius: 12px;
+            padding: 8px 14px;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+        }
+
+        .bar-wrap {
+            width: 150px;
+            height: 10px;
+            background: rgba(255,255,255,0.12);
+            border-radius: 6px;
+            overflow: hidden;
+            margin-top: 4px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .bar-fill {
+            height: 100%;
+            transition: width 0.15s ease;
+        }
+
+        #hp-fill { background: linear-gradient(90deg, #ff2a54, #00e676); width: 100%; }
+        #shield-fill { background: linear-gradient(90deg, #0088ff, #00f0ff); width: 100%; }
+        #xp-fill { background: linear-gradient(90deg, #b829ff, #ff8c00); width: 0%; }
+
+        .stat-label {
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--muted);
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .score-box {
+            font-size: 1.35rem;
+            font-weight: 900;
+            color: var(--cyan);
+            text-shadow: 0 0 10px var(--cyan-glow);
+        }
+
+        .combo-pill {
+            background: linear-gradient(135deg, var(--orange), #ff2a54);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-weight: 900;
+            font-size: 0.9rem;
+            box-shadow: 0 0 12px rgba(255, 140, 0, 0.5);
+        }
+
+        .icon-btn {
+            width: 42px;
+            height: 42px;
+            border-radius: 10px;
+            border: 1px solid rgba(0, 240, 255, 0.4);
+            background: rgba(12, 20, 44, 0.9);
+            color: #fff;
+            font-size: 1.15rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .icon-btn:hover, .icon-btn:active {
+            background: var(--cyan);
+            color: #000;
+            transform: translateY(-2px);
+        }
+
+        /* Boss Életerő Sáv */
+        #boss-hud {
+            position: absolute;
+            top: 86px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: min(520px, 90vw);
+            background: rgba(25, 6, 18, 0.92);
+            border: 2px solid var(--red);
+            border-radius: 12px;
+            padding: 8px 16px;
+            z-index: 10;
+            display: none;
+            text-align: center;
+            box-shadow: 0 0 25px rgba(255, 42, 84, 0.5);
+            pointer-events: none;
+        }
+
+        #boss-name {
+            font-size: 0.85rem;
+            font-weight: 900;
+            letter-spacing: 2px;
+            color: #ff8da1;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+
+        .boss-bar-bg {
+            width: 100%;
+            height: 12px;
+            background: rgba(255,255,255,0.12);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        #boss-hp-fill {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #ff0044, #ff8c00);
+            transition: width 0.1s;
+        }
+
+        /* Képernyő Overlay-ek */
+        .overlay-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 25;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle at center, rgba(10, 18, 42, 0.78), rgba(3, 5, 12, 0.94));
+            backdrop-filter: blur(8px);
+            padding: 16px;
+            overflow-y: auto;
+        }
+
+        .overlay-screen.active {
+            display: flex;
+        }
+
+        .modal-panel {
+            background: var(--panel-bg);
+            border: 1px solid rgba(0, 240, 255, 0.45);
+            border-radius: 20px;
+            padding: 24px;
+            max-width: 780px;
+            width: 100%;
+            max-height: 94vh;
+            overflow-y: auto;
+            text-align: center;
+            box-shadow: 0 15px 50px rgba(0,0,0,0.85), inset 0 0 30px rgba(0, 240, 255, 0.08);
+            animation: popIn 0.28s ease-out;
+        }
+
+        @keyframes popIn {
+            from { transform: scale(0.92); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .game-logo {
+            font-size: clamp(1.8rem, 4.5vw, 2.8rem);
+            font-weight: 900;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: var(--cyan);
+            text-shadow: 0 0 18px rgba(0, 240, 255, 0.55);
+            margin-bottom: 6px;
+        }
+
+        .subtitle {
+            color: var(--orange);
+            font-weight: 800;
+            letter-spacing: 2px;
+            font-size: 0.9rem;
+            margin-bottom: 14px;
+            text-transform: uppercase;
+        }
+
+        /* Űrhajó választó kártyák */
+        .ships-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 14px;
+            margin: 16px 0;
+        }
+
+        .ship-card {
+            background: rgba(255, 255, 255, 0.04);
+            border: 2px solid rgba(0, 240, 255, 0.25);
+            border-radius: 16px;
+            padding: 14px;
+            cursor: pointer;
+            transition: all 0.22s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .ship-card:hover, .ship-card.selected {
+            border-color: var(--cyan);
+            background: rgba(0, 240, 255, 0.14);
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px rgba(0, 240, 255, 0.28);
+        }
+
+        .ship-card h3 {
+            color: #fff;
+            font-size: 1.1rem;
+        }
+
+        .ship-card p {
+            font-size: 0.82rem;
+            color: var(--muted);
+            line-height: 1.35;
+        }
+
+        .stat-bars {
+            width: 100%;
+            font-size: 0.75rem;
+            text-align: left;
+            color: #cfe2ff;
+            margin-top: 4px;
+        }
+
+        /* Fejlesztés (Level-Up) Kártyák */
+        .upgrade-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 14px;
+            margin-top: 18px;
+        }
+
+        .upgrade-card {
+            background: linear-gradient(145deg, rgba(22, 34, 68, 0.95), rgba(10, 16, 36, 0.95));
+            border: 2px solid var(--purple);
+            border-radius: 16px;
+            padding: 18px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .upgrade-card:hover {
+            border-color: var(--orange);
+            transform: translateY(-5px) scale(1.02);
+            box-shadow: 0 8px 25px rgba(255, 140, 0, 0.4);
+        }
+
+        .upgrade-icon {
+            font-size: 2.2rem;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #0088ff, #00f0ff);
+            color: #030712;
+            font-weight: 900;
+            font-size: 1.05rem;
+            padding: 13px 28px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 5px 18px rgba(0, 240, 255, 0.45);
+            transition: all 0.2s;
+            margin: 6px;
+            display: inline-block;
+        }
+
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0, 240, 255, 0.75);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.3);
+            box-shadow: none;
+        }
+
+        /* Irányító gombok a képernyő alján (Mobilon és PC-n is elérhető gyorsgombok) */
+        #bottom-controls {
+            position: absolute;
+            bottom: 18px;
+            left: 0;
+            width: 100%;
+            padding: 0 22px;
+            display: none;
+            justify-content: space-between;
+            align-items: flex-end;
+            z-index: 15;
+            pointer-events: none;
+        }
+
+        .joystick-zone {
+            width: 124px;
+            height: 124px;
+            border-radius: 50%;
+            background: rgba(0, 240, 255, 0.08);
+            border: 2px solid rgba(0, 240, 255, 0.35);
+            position: relative;
+            pointer-events: auto;
+            touch-action: none;
+        }
+
+        .joystick-knob {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #00f0ff, #0066cc);
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.8);
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+            pointer-events: auto;
+        }
+
+        .skill-btn {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            border: 2px solid var(--orange);
+            background: radial-gradient(circle, rgba(255, 140, 0, 0.45), rgba(30, 15, 0, 0.9));
+            color: #fff;
+            font-weight: 900;
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            box-shadow: 0 0 20px rgba(255, 140, 0, 0.5);
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            touch-action: none;
+        }
+
+        .skill-btn:active {
+            transform: scale(0.92);
+        }
+
+        .dash-btn {
+            border-color: var(--cyan);
+            background: radial-gradient(circle, rgba(0, 240, 255, 0.35), rgba(0, 20, 40, 0.9));
+            box-shadow: 0 0 16px rgba(0, 240, 255, 0.4);
+        }
+
+        @media (max-width: 680px) {
+            .bar-wrap { width: 100px; }
+            .hud-card { padding: 6px 10px; }
+            .score-box { font-size: 1.05rem; }
+            .modal-panel { padding: 16px; }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas" tabindex="0"></canvas>
+
+    <!-- FELSŐ HUD -->
+    <header id="hud">
+        <div class="hud-left">
+            <div class="hud-card">
+                <div class="stat-label"><span>Páncél (HP)</span><span id="hp-text">100/100</span></div>
+                <div class="bar-wrap"><div class="bar-fill" id="hp-fill"></div></div>
+                <div class="stat-label" style="margin-top: 5px;"><span>Plazmapajzs</span><span id="shield-text">100%</span></div>
+                <div class="bar-wrap"><div class="bar-fill" id="shield-fill"></div></div>
+            </div>
+            <div class="hud-card">
+                <div class="stat-label"><span>Szint <strong id="lvl-num" style="color:#fff;">1</strong></span><span id="wave-text" style="color:var(--orange);">1. Hullám</span></div>
+                <div class="bar-wrap"><div class="bar-fill" id="xp-fill"></div></div>
+                <div style="font-size: 0.72rem; color: var(--muted); margin-top: 4px;">
+                    Szupernóva (SPACE): <strong id="ult-status" style="color: var(--green);">KÉSZ!</strong>
+                </div>
+            </div>
+        </div>
+
+        <div class="hud-right">
+            <div class="hud-card" style="text-align: right;">
+                <div class="stat-label">Pontszám</div>
+                <div class="score-box" id="score-display">0</div>
+            </div>
+            <div class="combo-pill" id="combo-display">x1</div>
+            <button class="icon-btn" id="btn-sound" title="Hang Be/Ki">🔊</button>
+            <button class="icon-btn" id="btn-fullscreen" title="Teljes képernyő">⛶</button>
+            <button class="icon-btn" id="btn-pause" title="Szünet (P / ESC)">⏸</button>
+        </div>
+    </header>
+
+    <!-- BOSS ÉLETERŐ SÁV -->
+    <div id="boss-hud">
+        <div id="boss-name">⚠️ DREADNOUGHT OMEGA - SZEKTORVEZÉR ⚠️</div>
+        <div class="boss-bar-bg"><div id="boss-hp-fill"></div></div>
+    </div>
+
+    <!-- ALSÓ VEZÉRLŐK (Virtuális Joystick + Speciális Képesség Gombok) -->
+    <div id="bottom-controls">
+        <div class="joystick-zone" id="joystick-zone" title="Húzd a mozgáshoz!">
+            <div class="joystick-knob" id="joystick-knob"></div>
+        </div>
+        <div class="action-buttons">
+            <button class="skill-btn dash-btn" id="btn-dash">⚡<br>Kitérés</button>
+            <button class="skill-btn" id="btn-nova">💥<br>Nóva</button>
+        </div>
+    </div>
+
+    <!-- 1. FŐMENÜ ÉS KARAKTERVÁLASZTÓ -->
+    <div class="overlay-screen active" id="screen-menu">
+        <div class="modal-panel">
+            <div class="game-logo">NOVA VANGUARD</div>
+            <div class="subtitle">A Kvantum Flotta • Valós Idejű Űrhajós Akciójáték</div>
+            <p style="color: #c5d6f0; font-size: 0.92rem; max-width: 600px; margin: 0 auto 12px auto; line-height: 1.45;">
+                A Mechanoid Raj megszállta a külső galaxist! Válassz űrvadászt, gyűjtsd a kvantumkristályokat, fejleszd a fegyverzetedet menet közben, és győzd le az 5 hullámon át érkező flottát és az Anyahajókat!
+            </p>
+
+            <h3 style="color: var(--cyan); font-size: 0.92rem; text-transform: uppercase; letter-spacing: 1px;">Válassz Űrvadászt:</h3>
+            <div class="ships-grid">
+                <div class="ship-card selected" data-ship="0">
+                    <svg width="60" height="60" viewBox="0 0 100 100">
+                        <polygon points="50,8 88,82 50,66 12,82" fill="#00f0ff"/>
+                        <polygon points="50,22 72,72 50,60 28,72" fill="#ffffff"/>
+                        <circle cx="50" cy="48" r="8" fill="#ff8c00"/>
+                    </svg>
+                    <h3>Viper-X9</h3>
+                    <p>Kiegyensúlyozott elfogóvadász dupla plazmaágyúval és gyors pajzzsal.</p>
+                    <div class="stat-bars">Sebesség: ★★★★☆<br>Tűzerő: ★★★★☆<br>Páncél: ★★★☆☆</div>
+                </div>
+
+                <div class="ship-card" data-ship="1">
+                    <svg width="60" height="60" viewBox="0 0 100 100">
+                        <polygon points="50,10 92,55 75,88 25,88 8,55" fill="#ff8c00"/>
+                        <polygon points="50,24 76,55 64,78 36,78 24,55" fill="#ffe0b2"/>
+                        <rect x="42" y="42" width="16" height="22" rx="4" fill="#ff2a54"/>
+                    </svg>
+                    <h3>Titan-MK4</h3>
+                    <p>Nehézpáncélzatú romboló, háromirányú szórt löveggel és extra életerővel.</p>
+                    <div class="stat-bars">Sebesség: ★★★☆☆<br>Tűzerő: ★★★★★<br>Páncél: ★★★★★</div>
+                </div>
+
+                <div class="ship-card" data-ship="2">
+                    <svg width="60" height="60" viewBox="0 0 100 100">
+                        <polygon points="50,5 70,50 95,75 50,62 5,75 30,50" fill="#b829ff"/>
+                        <polygon points="50,18 63,52 50,58 37,52" fill="#f3d5ff"/>
+                        <circle cx="50" cy="45" r="7" fill="#00f0ff"/>
+                    </svg>
+                    <h3>Phantom-Z</h3>
+                    <p>Hipergyors lopakodó, nagy tűzgyorsaságú iker-lézerrel és gyors kitéréssel.</p>
+                    <div class="stat-bars">Sebesség: ★★★★★<br>Tűzerő: ★★★★☆<br>Páncél: ★★★☆☆</div>
+                </div>
+            </div>
+
+            <div style="font-size: 0.82rem; color: var(--muted); margin-bottom: 12px;">
+                🏆 Rekord: <strong id="menu-highscore" style="color: var(--orange);">0</strong> pont |
+                🎮 Irányítás: <strong>WASD / Nyilak</strong> vagy <strong>Bal egérgomb nyomva tartása / Joystick</strong>, <strong>SHIFT</strong>: Kitérés, <strong>SPACE</strong>: Szupernóva
+            </div>
+
+            <button class="btn" id="btn-start-game">Csata Indítása ▶</button>
+        </div>
+    </div>
+
+    <!-- 2. SZINTLÉPÉS / FEJLESZTÉS VÁLASZTÓ -->
+    <div class="overlay-screen" id="screen-upgrade">
+        <div class="modal-panel">
+            <div class="game-logo" style="font-size: 2rem;">SZINTLÉPÉS!</div>
+            <div class="subtitle">Válassz egy azonnali harci fejlesztést az űrhajódhoz</div>
+            <div class="upgrade-grid" id="upgrade-container"></div>
+        </div>
+    </div>
+
+    <!-- 3. SZÜNET MENÜ -->
+    <div class="overlay-screen" id="screen-pause">
+        <div class="modal-panel" style="max-width: 460px;">
+            <div class="game-logo" style="font-size: 2rem;">JÁTÉK SZÜNETEL</div>
+            <p style="color: var(--muted); margin: 12px 0 20px 0;">A csata megállt. Készen állsz a folytatásra?</p>
+            <button class="btn" id="btn-resume">Folytatás ▶</button><br>
+            <button class="btn btn-secondary" id="btn-restart-pause">Újraindítás 🔄</button><br>
+            <button class="btn btn-secondary" id="btn-menu-pause">Főmenü 🏠</button>
+        </div>
+    </div>
+
+    <!-- 4. GYŐZELEM / VERESÉG KÉPERNYŐ -->
+    <div class="overlay-screen" id="screen-gameover">
+        <div class="modal-panel" style="max-width: 560px;">
+            <div class="game-logo" id="end-title">KÜLDETÉS TELJESÍTVE!</div>
+            <div class="subtitle" id="end-subtitle">A Galaxis Megmenekült</div>
+
+            <div id="new-record-badge" style="display:none; background: rgba(255,140,0,0.2); border: 1px solid var(--orange); color: var(--orange); padding: 8px; border-radius: 10px; font-weight: 800; margin-bottom: 14px;">
+                🌟 ÚJ CSILLAGFLOTTA REKORD! 🌟
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; text-align: left;">
+                <div class="hud-card">
+                    <div class="stat-label">Végső Pontszám</div>
+                    <div class="score-box" id="end-score">0</div>
+                </div>
+                <div class="hud-card">
+                    <div class="stat-label">Elért Hullám / Szint</div>
+                    <div class="score-box" id="end-wave" style="color: var(--orange);">1 / Szint 1</div>
+                </div>
+                <div class="hud-card">
+                    <div class="stat-label">Megsemmisített Ellenfél</div>
+                    <div class="score-box" id="end-kills" style="color: var(--green);">0</div>
+                </div>
+                <div class="hud-card">
+                    <div class="stat-label">Legnagyobb Kombó</div>
+                    <div class="score-box" id="end-combo" style="color: var(--purple);">x1</div>
+                </div>
+            </div>
+
+            <button class="btn" id="btn-restart-end">Új Küldetés Indítása 🔄</button>
+            <button class="btn btn-secondary" id="btn-menu-end">Hajóválasztó 🏠</button>
+        </div>
+    </div>
+
+    <script>
+        /* =========================================================
+           1. WEB AUDIO API HANGMOTOR (Szintetizált hangeffektek)
+           ========================================================= */
+        const AudioFX = {
+            ctx: null,
+            muted: false,
+
+            init() {
+                try {
+                    if (!this.ctx) {
+                        const AC = window.AudioContext || window.webkitAudioContext;
+                        if (AC) this.ctx = new AC();
+                    }
+                    if (this.ctx && this.ctx.state === 'suspended') {
+                        this.ctx.resume();
+                    }
+                } catch (e) {}
+            },
+
+            tone(freq, type, duration, vol = 0.08, slide = null) {
+                if (this.muted) return;
+                this.init();
+                if (!this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    if (slide) osc.frequency.exponentialRampToValueAtTime(slide, this.ctx.currentTime + duration);
+                    gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch (e) {}
+            },
+
+            shoot() { this.tone(680, 'sawtooth', 0.08, 0.04, 220); },
+            hit() { this.tone(190, 'square', 0.06, 0.05, 90); },
+            explosion() { this.tone(120, 'sawtooth', 0.28, 0.12, 32); },
+            gem() { this.tone(880, 'sine', 0.1, 0.06, 1320); },
+            dash() { this.tone(350, 'triangle', 0.18, 0.09, 900); },
+            nova() {
+                this.tone(150, 'sawtooth', 0.55, 0.15, 40);
+                setTimeout(() => this.tone(420, 'sine', 0.4, 0.1, 80), 80);
+            },
+            levelUp() {
+                [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => this.tone(f, 'triangle', 0.16, 0.1), i * 75));
+            }
+        };
+
+        /* =========================================================
+           2. ŰRHAJÓ OSZTÁLYOK ÉS FEJLESZTÉSI LISTA
+           ========================================================= */
+        const SHIP_CLASSES = [
+            { name: 'Viper-X9', color: '#00f0ff', speed: 5.5, maxHp: 120, maxShield: 60, fireRate: 11, dmg: 20, barrels: 2, spread: 0.08 },
+            { name: 'Titan-MK4', color: '#ff8c00', speed: 4.5, maxHp: 170, maxShield: 90, fireRate: 14, dmg: 24, barrels: 3, spread: 0.22 },
+            { name: 'Phantom-Z', color: '#b829ff', speed: 6.5, maxHp: 100, maxShield: 50, fireRate: 8, dmg: 16, barrels: 2, spread: 0.05 }
+        ];
+
+        const UPGRADES = [
+            { id: 'multishot', icon: '🔥', title: '+1 Plazmaágyú Cső', desc: 'Növeli az egyszerre kilőtt lövedékek számát.', apply: (p) => { p.barrels = Math.min(7, p.barrels + 1); p.spread = Math.min(0.42, p.spread + 0.05); } },
+            { id: 'damage', icon: '⚡', title: 'Kvantum Töltet (+30% Sebzés)', desc: 'Minden lövedéked sokkal erősebben pusztít.', apply: (p) => { p.dmg = Math.round(p.dmg * 1.3); } },
+            { id: 'firerate', icon: '🚀', title: 'Turbó Tűzgyorsaság', desc: '20%-kal gyorsabban tüzelnek a fegyvereid és a drónok.', apply: (p) => { p.fireRate = Math.max(4, Math.floor(p.fireRate * 0.8)); } },
+            { id: 'drone', icon: '🛸', title: 'Védő Harci Drón', desc: 'Egy keringő lézerdrón csatlakozik hozzád, ami automatikusan lő.', apply: (p) => { p.drones = Math.min(4, p.drones + 1); } },
+            { id: 'shield', icon: '🛡️', title: 'Páncél & Pajzsjavítás', desc: 'Max HP +30, Pajzs +25, és azonnal teljesen feltölti az életed!', apply: (p) => { p.maxHp += 30; p.hp = p.maxHp; p.maxShield += 25; p.shield = p.maxShield; } },
+            { id: 'speed', icon: '🧲', title: 'Hiperhajtómű & Mágnes', desc: 'Gyorsabb mozgás és kétszer nagyobb kristályvonzási távolság.', apply: (p) => { p.speed += 0.8; p.magnetRange += 90; } }
+        ];
+
+        /* =========================================================
+           3. JÁTÉK ÁLLAPOT ÉS VÁLTOZÓK
+           ========================================================= */
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let selectedShipIndex = 0;
+        let gameState = 'MENU';
+        let highScore = 0;
+
+        try {
+            highScore = parseInt(localStorage.getItem('nova_vanguard_highscore') || '0', 10) || 0;
+        } catch (e) { highScore = 0; }
+        document.getElementById('menu-highscore').textContent = highScore;
+
+        const keys = {};
+        const mouse = { x: 0, y: 0, down: false, active: false };
+        const joystick = { active: false, dx: 0, dy: 0, originX: 0, originY: 0, pointerId: null };
+
+        let player = null;
+        let bullets = [];
+        let enemyBullets = [];
+        let enemies = [];
+        let gems = [];
+        let particles = [];
+        let floatingTexts = [];
+        let stars = [];
+        let nebulae = [];
+
+        let score = 0;
+        let combo = 1;
+        let maxCombo = 1;
+        let comboTimer = 0;
+        let kills = 0;
+        let wave = 1;
+        let waveTimer = 0;
+        let spawnCounter = 0;
+        let screenShake = 0;
+        let activeBoss = null;
+
+        function resizeGame() {
+            canvas.width = window.innerWidth || 800;
+            canvas.height = window.innerHeight || 600;
+            initBackground();
+        }
+        window.addEventListener('resize', resizeGame);
+
+        function initBackground() {
+            stars = Array.from({ length: 110 }, () => ({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                size: Math.random() * 2.2 + 0.5,
+                depth: Math.random() * 0.7 + 0.15,
+                color: Math.random() > 0.8 ? '#00f0ff' : (Math.random() > 0.5 ? '#ffd280' : '#ffffff')
+            }));
+            nebulae = Array.from({ length: 5 }, () => ({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                r: Math.random() * 240 + 160,
+                color: Math.random() > 0.5 ? 'rgba(0, 180, 255, 0.06)' : 'rgba(184, 41, 255, 0.06)',
+                depth: 0.08
+            }));
+        }
+        resizeGame();
+
+        /* =========================================================
+           4. JÁTÉK INDÍTÁSA ÉS KEZELÉSE
+           ========================================================= */
+        function selectShip(idx) {
+            AudioFX.init();
+            AudioFX.gem();
+            selectedShipIndex = idx;
+            document.querySelectorAll('.ship-card').forEach(c => {
+                c.classList.toggle('selected', parseInt(c.dataset.ship, 10) === idx);
+            });
+        }
+
+        function showScreen(id) {
+            document.querySelectorAll('.overlay-screen').forEach(s => s.classList.remove('active'));
+            if (id) document.getElementById(id).classList.add('active');
+        }
+
+        function startNewGame() {
+            AudioFX.init();
+            const cfg = SHIP_CLASSES[selectedShipIndex];
+
+            player = {
+                x: canvas.width / 2,
+                y: canvas.height / 2,
+                vx: 0,
+                vy: 0,
+                angle: -Math.PI / 2,
+                radius: 20,
+                color: cfg.color,
+                shipType: selectedShipIndex,
+                speed: cfg.speed,
+                maxHp: cfg.maxHp,
+                hp: cfg.maxHp,
+                maxShield: cfg.maxShield,
+                shield: cfg.maxShield,
+                shieldRegenDelay: 0,
+                fireRate: cfg.fireRate,
+                fireCooldown: 0,
+                dmg: cfg.dmg,
+                barrels: cfg.barrels,
+                spread: cfg.spread,
+                drones: 0,
+                droneAngle: 0,
+                magnetRange: 140,
+                xp: 0,
+                xpNext: 90,
+                level: 1,
+                dashCooldown: 0,
+                invuln: 30,
+                novaCooldown: 0
+            };
+
+            bullets = [];
+            enemyBullets = [];
+            enemies = [];
+            gems = [];
+            particles = [];
+            floatingTexts = [];
+            activeBoss = null;
+
+            score = 0;
+            combo = 1;
+            maxCombo = 1;
+            comboTimer = 0;
+            kills = 0;
+            wave = 1;
+            waveTimer = 0;
+            spawnCounter = 0;
+
+            document.getElementById('hud').style.display = 'flex';
+            document.getElementById('boss-hud').style.display = 'none';
+            document.getElementById('bottom-controls').style.display = 'flex';
+
+            showScreen(null);
+            gameState = 'PLAYING';
+
+            // Kezdő ellenfelek azonnali megjelenítése, hogy a csata rögtön elinduljon
+            for (let i = 0; i < 4; i++) {
+                spawnEnemy();
+            }
+
+            updateHUD();
+            try {
+                window.focus();
+                canvas.focus();
+            } catch (e) {}
+        }
+
+        function pauseGame() {
+            if (gameState !== 'PLAYING') return;
+            gameState = 'PAUSED';
+            showScreen('screen-pause');
+        }
+
+        function resumeGame() {
+            if (gameState !== 'PAUSED') return;
+            showScreen(null);
+            gameState = 'PLAYING';
+            try { canvas.focus(); } catch (e) {}
+        }
+
+        function returnToMenu() {
+            gameState = 'MENU';
+            document.getElementById('hud').style.display = 'none';
+            document.getElementById('boss-hud').style.display = 'none';
+            document.getElementById('bottom-controls').style.display = 'none';
+            document.getElementById('menu-highscore').textContent = highScore;
+            showScreen('screen-menu');
+        }
+
+        /* =========================================================
+           5. BEMENET (Billentyűzet, Egér, Virtuális Joystick)
+           ========================================================= */
+        window.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
+                e.preventDefault();
+            }
+            if (e.code === 'Escape' || e.code === 'KeyP') {
+                if (gameState === 'PLAYING') pauseGame();
+                else if (gameState === 'PAUSED') resumeGame();
+            }
+            if (gameState === 'PLAYING') {
+                if (e.code === 'Space' || e.code === 'KeyE') triggerNovaBomb();
+                if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') triggerDash();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keys[e.code] = false;
+        });
+
+        canvas.addEventListener('pointermove', (e) => {
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+            mouse.active = true;
+        });
+
+        canvas.addEventListener('pointerdown', (e) => {
+            AudioFX.init();
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+            mouse.down = true;
+            mouse.active = true;
+            try { canvas.focus(); } catch (err) {}
+        });
+
+        window.addEventListener('pointerup', () => {
+            mouse.down = false;
+        });
+
+        // Virtuális Joystick (Egérrel és Érintéssel is működik)
+        const joyZone = document.getElementById('joystick-zone');
+        const joyKnob = document.getElementById('joystick-knob');
+
+        joyZone.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            AudioFX.init();
+            const rect = joyZone.getBoundingClientRect();
+            joystick.pointerId = e.pointerId;
+            joystick.originX = rect.left + rect.width / 2;
+            joystick.originY = rect.top + rect.height / 2;
+            joystick.active = true;
+            joyZone.setPointerCapture(e.pointerId);
+            updateJoystick(e.clientX, e.clientY);
+        });
+
+        joyZone.addEventListener('pointermove', (e) => {
+            if (!joystick.active || e.pointerId !== joystick.pointerId) return;
+            e.preventDefault();
+            updateJoystick(e.clientX, e.clientY);
+        });
+
+        function resetJoystick(e) {
+            if (e && joystick.pointerId !== null && e.pointerId !== joystick.pointerId) return;
+            joystick.active = false;
+            joystick.pointerId = null;
+            joystick.dx = 0;
+            joystick.dy = 0;
+            joyKnob.style.transform = `translate(-50%, -50%)`;
+        }
+
+        joyZone.addEventListener('pointerup', resetJoystick);
+        joyZone.addEventListener('pointercancel', resetJoystick);
+
+        function updateJoystick(cx, cy) {
+            const maxR = 42;
+            let dx = cx - joystick.originX;
+            let dy = cy - joystick.originY;
+            const dist = Math.hypot(dx, dy);
+            if (dist > maxR) {
+                dx = (dx / dist) * maxR;
+                dy = (dy / dist) * maxR;
+            }
+            joystick.dx = dx / maxR;
+            joystick.dy = dy / maxR;
+            joyKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+        }
+
+        /* =========================================================
+           6. SPECIÁLIS KÉPESSÉGEK ÉS FEJLESZTÉSEK
+           ========================================================= */
+        function triggerDash() {
+            if (!player || player.dashCooldown > 0 || gameState !== 'PLAYING') return;
+            AudioFX.dash();
+            player.dashCooldown = 70;
+            player.invuln = 26;
+
+            const moveAngle = (Math.hypot(player.vx, player.vy) > 0.2)
+                ? Math.atan2(player.vy, player.vx)
+                : player.angle;
+
+            player.x += Math.cos(moveAngle) * 120;
+            player.y += Math.sin(moveAngle) * 120;
+            clampPlayerToScreen();
+
+            for (let i = 0; i < 18; i++) {
+                spawnParticle(player.x, player.y, player.color, 4.5, 25);
+            }
+        }
+
+        function triggerNovaBomb() {
+            if (!player || player.novaCooldown > 0 || gameState !== 'PLAYING') return;
+            AudioFX.nova();
+            player.novaCooldown = 420; // ~7 mp
+            screenShake = 18;
+
+            enemyBullets = [];
+            for (let i = 0; i < 55; i++) {
+                spawnParticle(player.x, player.y, '#ff8c00', 9, 42);
+                spawnParticle(player.x, player.y, '#00f0ff', 7, 35);
+            }
+
+            enemies.forEach(en => {
+                en.hp -= player.dmg * 4.5;
+                spawnFloatingText(en.x, en.y, `-${Math.round(player.dmg * 4.5)}`, '#ff8c00');
+            });
+            updateHUD();
+        }
+
+        function openUpgradeScreen() {
+            AudioFX.levelUp();
+            gameState = 'UPGRADE';
+            const container = document.getElementById('upgrade-container');
+            container.innerHTML = '';
+
+            const pool = [...UPGRADES].sort(() => Math.random() - 0.5).slice(0, 3);
+            pool.forEach(up => {
+                const card = document.createElement('div');
+                card.className = 'upgrade-card';
+                card.innerHTML = `
+                    <div class="upgrade-icon">${up.icon}</div>
+                    <h3 style="color: var(--cyan); font-size: 1.05rem;">${up.title}</h3>
+                    <p style="font-size: 0.85rem; color: #c7d8f2;">${up.desc}</p>
+                `;
+                card.addEventListener('click', () => {
+                    up.apply(player);
+                    showScreen(null);
+                    gameState = 'PLAYING';
+                    updateHUD();
+                    try { canvas.focus(); } catch (e) {}
+                });
+                container.appendChild(card);
+            });
+
+            showScreen('screen-upgrade');
+        }
+
+        /* =========================================================
+           7. ELLENFELEK ÉS BOSS GENERÁLÁSA
+           ========================================================= */
+        function spawnEnemy() {
+            const margin = 45;
+            let x, y;
+            if (Math.random() < 0.5) {
+                x = Math.random() < 0.5 ? -margin : canvas.width + margin;
+                y = Math.random() * canvas.height;
+            } else {
+                x = Math.random() * canvas.width;
+                y = Math.random() < 0.5 ? -margin : canvas.height + margin;
+            }
+
+            const r = Math.random();
+            let type = 'chaser';
+            if (wave >= 2 && r > 0.55) type = 'shooter';
+            if (wave >= 3 && r > 0.82) type = 'rusher';
+
+            const scale = 1 + (wave - 1) * 0.25;
+            if (type === 'chaser') {
+                enemies.push({
+                    type, x, y, radius: 16,
+                    hp: Math.round(30 * scale), maxHp: Math.round(30 * scale),
+                    speed: 2.1 + Math.random() * 0.6,
+                    color: '#ff2a54', xp: 22, score: 100
+                });
+            } else if (type === 'shooter') {
+                enemies.push({
+                    type, x, y, radius: 20,
+                    hp: Math.round(50 * scale), maxHp: Math.round(50 * scale),
+                    speed: 1.45, fireCd: 90,
+                    color: '#b829ff', xp: 35, score: 180
+                });
+            } else {
+                enemies.push({
+                    type, x, y, radius: 14,
+                    hp: Math.round(24 * scale), maxHp: Math.round(24 * scale),
+                    speed: 3.7,
+                    color: '#ff8c00', xp: 30, score: 150
+                });
+            }
+        }
+
+        function spawnBoss(bossWave) {
+            const isFinal = bossWave >= 5;
+            const maxHp = isFinal ? 2400 : 1100;
+            activeBoss = {
+                type: 'boss',
+                name: isFinal ? '⚠️ DREADNOUGHT OMEGA - VÉGSŐ ANYAHAJÓ ⚠️' : '⚠️ KRONOSZ CSATACIRKÁLÓ - SZEKTORVEZÉR ⚠️',
+                x: canvas.width / 2,
+                y: -80,
+                radius: 48,
+                hp: maxHp,
+                maxHp: maxHp,
+                speed: 1.4,
+                fireCd: 55,
+                color: isFinal ? '#ff0044' : '#ff8c00',
+                xp: 250,
+                score: isFinal ? 5000 : 2000,
+                isFinal
+            };
+            enemies.push(activeBoss);
+            document.getElementById('boss-name').textContent = activeBoss.name;
+            document.getElementById('boss-hud').style.display = 'block';
+            spawnFloatingText(canvas.width / 2, canvas.height / 3, 'FIGYELEM! BOSS ÉRKEZIK!', '#ff2a54');
+        }
+
+        /* =========================================================
+           8. FŐ JÁTÉKCIKLUS (UPDATE & FIZIKA)
+           ========================================================= */
+        function clampPlayerToScreen() {
+            const pad = player.radius;
+            player.x = Math.max(pad, Math.min(canvas.width - pad, player.x));
+            player.y = Math.max(pad, Math.min(canvas.height - pad, player.y));
+        }
+
+        function spawnParticle(x, y, color, speed, life) {
+            if (particles.length > 180) particles.shift();
+            const ang = Math.random() * Math.PI * 2;
+            const spd = Math.random() * speed + 0.5;
+            particles.push({
+                x, y,
+                vx: Math.cos(ang) * spd,
+                vy: Math.sin(ang) * spd,
+                color,
+                life, maxLife: life,
+                size: Math.random() * 3.5 + 1.5
+            });
+        }
+
+        function spawnFloatingText(x, y, text, color) {
+            floatingTexts.push({ x, y, text, color, life: 45 });
+        }
+
+        function updateGame() {
+            if (gameState !== 'PLAYING' || !player) return;
+
+            waveTimer++;
+            if (waveTimer % 720 === 0 && wave < 5 && !activeBoss) {
+                wave++;
+                spawnFloatingText(player.x, player.y - 40, `${wave}. HULLÁM!`, '#00f0ff');
+                if (wave === 3 || wave === 5) {
+                    spawnBoss(wave);
+                }
+            }
+
+            spawnCounter++;
+            const spawnInterval = Math.max(24, 65 - wave * 9);
+            if (spawnCounter >= spawnInterval && enemies.length < 28) {
+                spawnCounter = 0;
+                spawnEnemy();
+            }
+
+            // Játékos mozgása: WASD / Nyilak / Joystick / Bal egérgomb nyomva tartva
+            let mx = 0, my = 0;
+            if (keys['KeyW'] || keys['ArrowUp']) my -= 1;
+            if (keys['KeyS'] || keys['ArrowDown']) my += 1;
+            if (keys['KeyA'] || keys['ArrowLeft']) mx -= 1;
+            if (keys['KeyD'] || keys['ArrowRight']) mx += 1;
+
+            if (joystick.active) {
+                mx = joystick.dx;
+                my = joystick.dy;
+            } else if (mouse.down && mx === 0 && my === 0) {
+                const dx = mouse.x - player.x;
+                const dy = mouse.y - player.y;
+                const dist = Math.hypot(dx, dy);
+                if (dist > 28) {
+                    mx = dx / dist;
+                    my = dy / dist;
+                }
+            }
+
+            if (mx !== 0 || my !== 0) {
+                const len = Math.hypot(mx, my);
+                if (len > 1) { mx /= len; my /= len; }
+                player.vx = mx * player.speed;
+                player.vy = my * player.speed;
+                player.x += player.vx;
+                player.y += player.vy;
+                clampPlayerToScreen();
+            } else {
+                player.vx *= 0.8;
+                player.vy *= 0.8;
+            }
+
+            // Célzás iránya: legközelebbi ellenfélre vagy az egér felé
+            let targetAngle = player.angle;
+            if (mouse.active && !joystick.active && !mouse.down) {
+                targetAngle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
+            } else if (enemies.length > 0) {
+                let nearest = null, minDist = Infinity;
+                for (let en of enemies) {
+                    const d = Math.hypot(en.x - player.x, en.y - player.y);
+                    if (d < minDist) { minDist = d; nearest = en; }
+                }
+                if (nearest) targetAngle = Math.atan2(nearest.y - player.y, nearest.x - player.x);
+            } else if (Math.hypot(player.vx, player.vy) > 0.2) {
+                targetAngle = Math.atan2(player.vy, player.vx);
+            }
+            player.angle = targetAngle;
+
+            if (player.dashCooldown > 0) player.dashCooldown--;
+            if (player.invuln > 0) player.invuln--;
+            if (player.novaCooldown > 0) {
+                player.novaCooldown--;
+                if (player.novaCooldown % 15 === 0 || player.novaCooldown === 0) updateHUD();
+            }
+
+            if (player.shieldRegenDelay > 0) {
+                player.shieldRegenDelay--;
+            } else if (player.shield < player.maxShield) {
+                player.shield = Math.min(player.maxShield, player.shield + 0.12);
+            }
+
+            if (comboTimer > 0) {
+                comboTimer--;
+                if (comboTimer === 0) { combo = 1; updateHUD(); }
+            }
+
+            // Automatikus Tüzelés + Harci Drónok
+            player.fireCooldown--;
+            if (player.fireCooldown <= 0 && (enemies.length > 0 || mouse.down)) {
+                player.fireCooldown = player.fireRate;
+                AudioFX.shoot();
+
+                const count = player.barrels;
+                const totalSpread = player.spread * (count - 1);
+                const startAng = player.angle - totalSpread / 2;
+
+                for (let i = 0; i < count; i++) {
+                    const ang = count === 1 ? player.angle : startAng + i * player.spread;
+                    bullets.push({
+                        x: player.x + Math.cos(ang) * 20,
+                        y: player.y + Math.sin(ang) * 20,
+                        vx: Math.cos(ang) * 12,
+                        vy: Math.sin(ang) * 12,
+                        dmg: player.dmg,
+                        color: player.color,
+                        life: 75
+                    });
+                }
+
+                for (let d = 0; d < player.drones; d++) {
+                    const dAng = player.droneAngle + (d * Math.PI * 2) / player.drones;
+                    const dx = player.x + Math.cos(dAng) * 44;
+                    const dy = player.y + Math.sin(dAng) * 44;
+                    bullets.push({
+                        x: dx, y: dy,
+                        vx: Math.cos(player.angle) * 11,
+                        vy: Math.sin(player.angle) * 11,
+                        dmg: Math.round(player.dmg * 0.6),
+                        color: '#00e676',
+                        life: 65
+                    });
+                }
+            }
+            player.droneAngle += 0.05;
+
+            // Játékos Lövedékeinek Frissítése
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const b = bullets[i];
+                b.x += b.vx;
+                b.y += b.vy;
+                b.life--;
+                if (b.life <= 0 || b.x < -30 || b.x > canvas.width + 30 || b.y < -30 || b.y > canvas.height + 30) {
+                    bullets.splice(i, 1);
+                }
+            }
+
+            // Ellenfelek és Boss Mozgása + Ütközésvizsgálat
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                const en = enemies[i];
+                const ang = Math.atan2(player.y - en.y, player.x - en.x);
+
+                if (en.type === 'boss') {
+                    if (en.y < 140) en.y += en.speed;
+                    else en.x += Math.cos(waveTimer * 0.02) * 2.2;
+
+                    en.fireCd--;
+                    if (en.fireCd <= 0) {
+                        en.fireCd = en.isFinal ? 42 : 58;
+                        const shots = en.isFinal ? 10 : 6;
+                        for (let s = 0; s < shots; s++) {
+                            const sAng = ang + ((s - shots / 2) * 0.25);
+                            enemyBullets.push({
+                                x: en.x, y: en.y,
+                                vx: Math.cos(sAng) * 5.2,
+                                vy: Math.sin(sAng) * 5.2,
+                                radius: 6, dmg: 18
+                            });
+                        }
+                    }
+                    document.getElementById('boss-hp-fill').style.width = `${Math.max(0, (en.hp / en.maxHp) * 100)}%`;
+                } else {
+                    en.x += Math.cos(ang) * en.speed;
+                    en.y += Math.sin(ang) * en.speed;
+
+                    if (en.type === 'shooter') {
+                        en.fireCd--;
+                        if (en.fireCd <= 0) {
+                            en.fireCd = 105;
+                            enemyBullets.push({
+                                x: en.x, y: en.y,
+                                vx: Math.cos(ang) * 5.5,
+                                vy: Math.sin(ang) * 5.5,
+                                radius: 5, dmg: 14
+                            });
+                        }
+                    }
+                }
+
+                for (let j = bullets.length - 1; j >= 0; j--) {
+                    const b = bullets[j];
+                    if (Math.hypot(b.x - en.x, b.y - en.y) < en.radius + 6) {
+                        en.hp -= b.dmg;
+                        bullets.splice(j, 1);
+                        AudioFX.hit();
+                        for (let p = 0; p < 4; p++) spawnParticle(b.x, b.y, en.color, 3.5, 16);
+                        if (en.hp <= 0) break;
+                    }
+                }
+
+                if (en.hp > 0 && Math.hypot(player.x - en.x, player.y - en.y) < player.radius + en.radius) {
+                    damagePlayer(en.type === 'boss' ? 28 : 18);
+                    if (en.type !== 'boss') en.hp = 0;
+                }
+
+                if (en.hp <= 0) {
+                    AudioFX.explosion();
+                    for (let p = 0; p < (en.type === 'boss' ? 45 : 14); p++) {
+                        spawnParticle(en.x, en.y, en.color, en.type === 'boss' ? 8 : 4.5, 30);
+                    }
+
+                    kills++;
+                    combo = Math.min(12, combo + 1);
+                    if (combo > maxCombo) maxCombo = combo;
+                    comboTimer = 210;
+
+                    const pts = en.score * combo;
+                    score += pts;
+                    spawnFloatingText(en.x, en.y, `+${pts}`, '#00f0ff');
+
+                    gems.push({
+                        x: en.x, y: en.y,
+                        xp: en.xp,
+                        heal: Math.random() < 0.14
+                    });
+
+                    if (en.type === 'boss') {
+                        document.getElementById('boss-hud').style.display = 'none';
+                        const wasFinal = en.isFinal;
+                        activeBoss = null;
+                        enemies.splice(i, 1);
+                        if (wasFinal) {
+                            endGame(true);
+                            return;
+                        }
+                    } else {
+                        enemies.splice(i, 1);
+                    }
+                    updateHUD();
+                }
+            }
+
+            // Ellenséges lövedékek
+            for (let i = enemyBullets.length - 1; i >= 0; i--) {
+                const eb = enemyBullets[i];
+                eb.x += eb.vx;
+                eb.y += eb.vy;
+                if (Math.hypot(eb.x - player.x, eb.y - player.y) < player.radius + eb.radius) {
+                    damagePlayer(eb.dmg);
+                    enemyBullets.splice(i, 1);
+                    continue;
+                }
+                if (eb.x < -40 || eb.x > canvas.width + 40 || eb.y < -40 || eb.y > canvas.height + 40) {
+                    enemyBullets.splice(i, 1);
+                }
+            }
+
+            // Kristályok (XP) begyűjtése
+            for (let i = gems.length - 1; i >= 0; i--) {
+                const g = gems[i];
+                const d = Math.hypot(player.x - g.x, player.y - g.y);
+                if (d < player.magnetRange) {
+                    const ang = Math.atan2(player.y - g.y, player.x - g.x);
+                    g.x += Math.cos(ang) * 7.5;
+                    g.y += Math.sin(ang) * 7.5;
+                }
+                if (d < player.radius + 12) {
+                    AudioFX.gem();
+                    if (g.heal) {
+                        player.hp = Math.min(player.maxHp, player.hp + 25);
+                        spawnFloatingText(player.x, player.y, '+25 HP', '#00e676');
+                    }
+                    player.xp += g.xp;
+                    gems.splice(i, 1);
+
+                    if (player.xp >= player.xpNext) {
+                        player.xp -= player.xpNext;
+                        player.level++;
+                        player.xpNext = Math.round(player.xpNext * 1.35);
+                        openUpgradeScreen();
+                        return;
+                    }
+                    updateHUD();
+                }
+            }
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life--;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+
+            for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                const ft = floatingTexts[i];
+                ft.y -= 1.1;
+                ft.life--;
+                if (ft.life <= 0) floatingTexts.splice(i, 1);
+            }
+
+            if (screenShake > 0) screenShake *= 0.85;
+        }
+
+        function damagePlayer(amount) {
+            if (player.invuln > 0) return;
+            player.invuln = 28;
+            player.shieldRegenDelay = 180;
+            screenShake = 12;
+            AudioFX.explosion();
+
+            if (player.shield >= amount) {
+                player.shield -= amount;
+            } else {
+                const rem = amount - player.shield;
+                player.shield = 0;
+                player.hp -= rem;
+            }
+
+            combo = 1;
+            updateHUD();
+
+            if (player.hp <= 0) {
+                player.hp = 0;
+                endGame(false);
+            }
+        }
+
+        function updateHUD() {
+            if (!player) return;
+            document.getElementById('hp-text').textContent = `${Math.ceil(player.hp)}/${player.maxHp}`;
+            document.getElementById('hp-fill').style.width = `${Math.max(0, (player.hp / player.maxHp) * 100)}%`;
+
+            const shPct = Math.round((player.shield / player.maxShield) * 100);
+            document.getElementById('shield-text').textContent = `${shPct}%`;
+            document.getElementById('shield-fill').style.width = `${shPct}%`;
+
+            document.getElementById('lvl-num').textContent = player.level;
+            document.getElementById('wave-text').textContent = `${wave}. Hullám`;
+            document.getElementById('xp-fill').style.width = `${Math.min(100, (player.xp / player.xpNext) * 100)}%`;
+
+            const ultEl = document.getElementById('ult-status');
+            if (player.novaCooldown <= 0) {
+                ultEl.textContent = 'KÉSZ!';
+                ultEl.style.color = 'var(--green)';
+            } else {
+                ultEl.textContent = `${Math.ceil(player.novaCooldown / 60)}s`;
+                ultEl.style.color = 'var(--orange)';
+            }
+
+            document.getElementById('score-display').textContent = score;
+            document.getElementById('combo-display').textContent = `x${combo}`;
+        }
+
+        function endGame(victory) {
+            gameState = 'GAMEOVER';
+            document.getElementById('boss-hud').style.display = 'none';
+            document.getElementById('bottom-controls').style.display = 'none';
+
+            let isNewRecord = false;
+            if (score > highScore) {
+                highScore = score;
+                isNewRecord = true;
+                try { localStorage.setItem('nova_vanguard_highscore', String(highScore)); } catch (e) {}
+            }
+
+            document.getElementById('new-record-badge').style.display = isNewRecord ? 'block' : 'none';
+            const titleEl = document.getElementById('end-title');
+            const subEl = document.getElementById('end-subtitle');
+
+            if (victory) {
+                AudioFX.levelUp();
+                titleEl.textContent = 'GYŐZELEM! A GALAXIS SZABAD!';
+                subEl.textContent = 'Legyőzted a Dreadnought Omega Anyahajót!';
+            } else {
+                titleEl.textContent = 'PAJZSOK ÖSSZEOMLOTTAK';
+                subEl.textContent = 'A csillagflotta visszavonult javításra — próbáld újra!';
+            }
+
+            document.getElementById('end-score').textContent = score;
+            document.getElementById('end-wave').textContent = `${wave}. Hullám / Szint ${player.level}`;
+            document.getElementById('end-kills').textContent = kills;
+            document.getElementById('end-combo').textContent = `x${maxCombo}`;
+
+            showScreen('screen-gameover');
+        }
+
+        /* =========================================================
+           9. CANVAS RENDERELÉS (60 FPS Látványvilág)
+           ========================================================= */
+        function renderGame() {
+            ctx.save();
+            ctx.fillStyle = '#04060f';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (screenShake > 0.5) {
+                ctx.translate((Math.random() - 0.5) * screenShake, (Math.random() - 0.5) * screenShake);
+            }
+
+            const px = player ? player.x : (canvas.width / 2 + Math.cos(Date.now() * 0.0005) * 80);
+            const py = player ? player.y : (canvas.height / 2 + Math.sin(Date.now() * 0.0005) * 80);
+
+            for (let n of nebulae) {
+                const nx = (n.x - px * n.depth + canvas.width * 2) % canvas.width;
+                const ny = (n.y - py * n.depth + canvas.height * 2) % canvas.height;
+                const grad = ctx.createRadialGradient(nx, ny, 10, nx, ny, n.r);
+                grad.addColorStop(0, n.color);
+                grad.addColorStop(1, 'transparent');
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(nx, ny, n.r, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            for (let s of stars) {
+                const sx = (s.x - px * s.depth + canvas.width * 2) % canvas.width;
+                const sy = (s.y - py * s.depth + canvas.height * 2) % canvas.height;
+                ctx.fillStyle = s.color;
+                ctx.beginPath();
+                ctx.arc(sx, sy, s.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            if (!player) {
+                ctx.restore();
+                return;
+            }
+
+            for (let g of gems) {
+                ctx.save();
+                ctx.translate(g.x, g.y);
+                ctx.fillStyle = g.heal ? '#00e676' : '#00f0ff';
+                ctx.shadowColor = g.heal ? '#00e676' : '#00f0ff';
+                ctx.shadowBlur = 10;
+                ctx.beginPath();
+                ctx.moveTo(0, -8);
+                ctx.lineTo(7, 0);
+                ctx.lineTo(0, 8);
+                ctx.lineTo(-7, 0);
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
+            }
+
+            for (let p of particles) {
+                ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+
+            for (let b of bullets) {
+                ctx.fillStyle = b.color;
+                ctx.shadowColor = b.color;
+                ctx.shadowBlur = 8;
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, 4.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            for (let eb of enemyBullets) {
+                ctx.fillStyle = '#ff2a54';
+                ctx.shadowColor = '#ff2a54';
+                ctx.shadowBlur = 8;
+                ctx.beginPath();
+                ctx.arc(eb.x, eb.y, eb.radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.shadowBlur = 0;
+
+            for (let en of enemies) {
+                ctx.save();
+                ctx.translate(en.x, en.y);
+                ctx.fillStyle = en.color;
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+
+                if (en.type === 'boss') {
+                    ctx.beginPath();
+                    for (let k = 0; k < 8; k++) {
+                        const a = (k * Math.PI) / 4 + waveTimer * 0.01;
+                        const r = k % 2 === 0 ? en.radius : en.radius * 0.68;
+                        if (k === 0) ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+                        else ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+                    }
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+                } else {
+                    ctx.beginPath();
+                    ctx.arc(0, 0, en.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+
+            ctx.save();
+            ctx.translate(player.x, player.y);
+
+            if (player.shield > 5) {
+                ctx.strokeStyle = 'rgba(0, 240, 255, 0.45)';
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                ctx.arc(0, 0, player.radius + 7, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            ctx.rotate(player.angle + Math.PI / 2);
+            ctx.fillStyle = player.invuln % 4 > 2 ? '#ffffff' : player.color;
+            ctx.shadowColor = player.color;
+            ctx.shadowBlur = 12;
+
+            ctx.beginPath();
+            ctx.moveTo(0, -22);
+            ctx.lineTo(18, 18);
+            ctx.lineTo(0, 10);
+            ctx.lineTo(-18, 18);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+
+            for (let d = 0; d < player.drones; d++) {
+                const dAng = player.droneAngle + (d * Math.PI * 2) / player.drones;
+                const dx = player.x + Math.cos(dAng) * 44;
+                const dy = player.y + Math.sin(dAng) * 44;
+                ctx.fillStyle = '#00e676';
+                ctx.beginPath();
+                ctx.arc(dx, dy, 6, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            ctx.font = 'bold 15px Segoe UI, sans-serif';
+            ctx.textAlign = 'center';
+            for (let ft of floatingTexts) {
+                ctx.fillStyle = ft.color;
+                ctx.fillText(ft.text, ft.x, ft.y);
+            }
+
+            ctx.restore();
+        }
+
+        function gameLoop() {
+            updateGame();
+            renderGame();
+            requestAnimationFrame(gameLoop);
+        }
+
+        /* =========================================================
+           10. GOMBOK ÉS ESEMÉNYKEZELŐK BEKÖTÉSE
+           ========================================================= */
+        document.querySelectorAll('.ship-card').forEach(card => {
+            card.addEventListener('click', () => {
+                selectShip(parseInt(card.dataset.ship, 10));
+            });
+        });
+
+        document.getElementById('btn-start-game').addEventListener('click', startNewGame);
+        document.getElementById('btn-resume').addEventListener('click', resumeGame);
+        document.getElementById('btn-restart-pause').addEventListener('click', startNewGame);
+        document.getElementById('btn-menu-pause').addEventListener('click', returnToMenu);
+        document.getElementById('btn-restart-end').addEventListener('click', startNewGame);
+        document.getElementById('btn-menu-end').addEventListener('click', returnToMenu);
+
+        document.getElementById('btn-dash').addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            triggerDash();
+        });
+        document.getElementById('btn-nova').addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            triggerNovaBomb();
+        });
+
+        document.getElementById('btn-sound').addEventListener('click', () => {
+            AudioFX.muted = !AudioFX.muted;
+            document.getElementById('btn-sound').textContent = AudioFX.muted ? '🔇' : '🔊';
+        });
+
+        document.getElementById('btn-fullscreen').addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(() => {});
+            } else {
+                document.exitFullscreen().catch(() => {});
+            }
+        });
+
+        document.getElementById('btn-pause').addEventListener('click', () => {
+            if (gameState === 'PLAYING') pauseGame();
+            else if (gameState === 'PAUSED') resumeGame();
+        });
+
+        // Azonnali indítás
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
