@@ -1,0 +1,1132 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BioKaland: Az Élet Laborja - 7. osztály</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            background: linear-gradient(135deg, #ecfdf5 0%, #e0f2fe 50%, #f0fdf4 100%);
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        /* Animációk */
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-6px); }
+        }
+        @keyframes pulse-glow {
+            0%, 100% { filter: drop-shadow(0 0 6px rgba(16, 185, 129, 0.6)); transform: scale(1); }
+            50% { filter: drop-shadow(0 0 14px rgba(16, 185, 129, 0.95)); transform: scale(1.04); }
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-6px) rotate(-2deg); }
+            75% { transform: translateX(6px) rotate(2deg); }
+        }
+        @keyframes popIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .animate-float { animation: float 3s ease-in-out infinite; }
+        .animate-glow { animation: pulse-glow 2s infinite; }
+        .animate-shake { animation: shake 0.4s ease-in-out; }
+        .animate-pop { animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+
+        /* Játék gomb stílusok */
+        .btn-game {
+            transition: all 0.15s ease;
+            box-shadow: 0 5px 0 rgba(0, 0, 0, 0.18);
+        }
+        .btn-game:active:not(:disabled) {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 rgba(0, 0, 0, 0.18);
+        }
+
+        /* Egyedi görgetősáv elrejtése mobilra */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Sejtszervecske kijelölés */
+        .organelle {
+            cursor: pointer;
+            transition: all 0.25s ease;
+        }
+        .organelle:hover {
+            filter: brightness(1.15) drop-shadow(0 0 8px rgba(255,255,255,0.8));
+        }
+        .organelle-found {
+            opacity: 0.45;
+            pointer-events: none;
+            filter: grayscale(40%);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between text-slate-800 overflow-x-hidden">
+
+    <!-- FELSŐ ÁLLAPOTSÁV (HUD) -->
+    <header id="hud" class="hidden sticky top-0 z-30 bg-white/90 backdrop-blur-md shadow-sm border-b border-emerald-100 px-3 py-2 sm:px-6 sm:py-3">
+        <div class="max-w-3xl mx-auto flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+                <!-- Szint kijelző -->
+                <div class="flex items-center gap-2">
+                    <span id="hud-level-badge" class="bg-emerald-600 text-white font-black text-xs sm:text-sm px-2.5 py-1 rounded-xl shadow-sm">
+                        1/4. SZINT
+                    </span>
+                    <span id="hud-level-title" class="font-extrabold text-sm sm:text-base text-emerald-950 truncate max-w-[140px] sm:max-w-xs">
+                        Molekula Műhely
+                    </span>
+                </div>
+
+                <!-- Életek, Széria, Pontszám, Hang -->
+                <div class="flex items-center gap-2 sm:gap-4">
+                    <div id="hud-lives" class="flex items-center text-base sm:text-lg tracking-tighter" title="Életek">
+                        ❤️❤️❤️
+                    </div>
+                    <div class="bg-amber-100 border border-amber-300 text-amber-800 font-extrabold text-xs sm:text-sm px-2.5 py-1 rounded-xl flex items-center gap-1">
+                        <span>⭐</span>
+                        <span id="hud-score">0</span>
+                    </div>
+                    <button id="btn-sound" onclick="toggleSound()" class="p-1.5 sm:p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-base sm:text-lg transition" title="Hang be/ki">
+                        🔊
+                    </button>
+                </div>
+            </div>
+
+            <!-- Haladásjelző sáv -->
+            <div class="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
+                <div id="hud-progress" class="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500" style="width: 10%"></div>
+            </div>
+        </div>
+    </header>
+
+    <!-- FŐ JÁTÉKTÉR -->
+    <main class="flex-grow flex items-center justify-center p-3 sm:p-6">
+        <div class="w-full max-w-2xl mx-auto">
+
+            <!-- 1. KEZDŐKÉPERNYŐ -->
+            <section id="screen-start" class="bg-white rounded-3xl shadow-xl border-2 border-emerald-100 p-6 sm:p-8 text-center animate-pop">
+                <div class="w-28 h-28 sm:w-32 sm:h-32 mx-auto mb-4 bg-emerald-50 rounded-full flex items-center justify-center border-4 border-emerald-200 animate-float">
+                    <!-- Mikroszkóp & Sejt SVG ikon -->
+                    <svg viewBox="0 0 120 120" class="w-20 h-20 sm:w-24 sm:h-24">
+                        <circle cx="60" cy="60" r="50" fill="#a7f3d0" stroke="#10b981" stroke-width="4" stroke-dasharray="10 5"/>
+                        <circle cx="60" cy="60" r="36" fill="#34d399" opacity="0.4"/>
+                        <ellipse cx="42" cy="45" rx="10" ry="6" transform="rotate(-30 42 45)" fill="#fbbf24" stroke="#d97706" stroke-width="2"/>
+                        <ellipse cx="78" cy="72" rx="11" ry="7" transform="rotate(25 78 72)" fill="#38bdf8" stroke="#0284c7" stroke-width="2"/>
+                        <circle cx="60" cy="58" r="16" fill="#a855f7" stroke="#7e22ce" stroke-width="3"/>
+                        <circle cx="64" cy="54" r="5" fill="#e9d5ff"/>
+                    </svg>
+                </div>
+
+                <span class="inline-block bg-teal-100 text-teal-800 text-xs sm:text-sm font-extrabold px-3 py-1 rounded-full mb-2 uppercase tracking-wider">
+                    7. Osztályos Biológia Kaland
+                </span>
+                <h1 class="text-3xl sm:text-4xl font-black text-emerald-950 mb-3">
+                    BioKaland: Az Élet Laborja
+                </h1>
+                <p class="text-slate-600 text-sm sm:text-base mb-6 max-w-lg mx-auto leading-relaxed">
+                    Segíts <strong>Dr. Flórának</strong> helyreállítani a Biodóm egyensúlyát! Utazz a parányi molekuláktól a növényi sejteken át egészen a teljes ökoszisztémáig!
+                </p>
+
+                <!-- 4 Szint előnézet -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-7 text-left">
+                    <div class="bg-sky-50 border border-sky-200 p-3 rounded-2xl">
+                        <div class="text-2xl mb-1">🧪</div>
+                        <div class="font-extrabold text-xs text-sky-900">1. Szint</div>
+                        <div class="text-xs text-sky-700">Molekulák</div>
+                    </div>
+                    <div class="bg-emerald-50 border border-emerald-200 p-3 rounded-2xl">
+                        <div class="text-2xl mb-1">🔬</div>
+                        <div class="font-extrabold text-xs text-emerald-900">2. Szint</div>
+                        <div class="text-xs text-emerald-700">Sejttérkép</div>
+                    </div>
+                    <div class="bg-amber-50 border border-amber-200 p-3 rounded-2xl">
+                        <div class="text-2xl mb-1">☀️</div>
+                        <div class="font-extrabold text-xs text-amber-900">3. Szint</div>
+                        <div class="text-xs text-amber-700">Fotoszintézis</div>
+                    </div>
+                    <div class="bg-purple-50 border border-purple-200 p-3 rounded-2xl">
+                        <div class="text-2xl mb-1">🦊</div>
+                        <div class="font-extrabold text-xs text-purple-900">4. Szint</div>
+                        <div class="text-xs text-purple-700">Populációk</div>
+                    </div>
+                </div>
+
+                <button onclick="startGame()" class="btn-game w-full sm:w-auto min-w-[240px] bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black text-lg sm:text-xl py-4 px-8 rounded-2xl">
+                    🚀 Kaland Indítása!
+                </button>
+            </section>
+
+            <!-- 2. SZINT 1: MOLEKULA MŰHELY -->
+            <section id="screen-level-1" class="hidden bg-white rounded-3xl shadow-xl border-2 border-sky-100 p-4 sm:p-6 animate-pop">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="bg-sky-100 text-sky-800 text-xs font-extrabold px-3 py-1 rounded-full">
+                        🧪 1. Küldetés: Molekulák világa
+                    </span>
+                    <span id="l1-counter" class="text-xs font-bold text-slate-500">1 / 5</span>
+                </div>
+
+                <p class="text-xs sm:text-sm text-slate-500 mb-3">
+                    Milyen típusú anyag a kártyán látható molekula, és mi a feladata az élőlényekben?
+                </p>
+
+                <!-- Molekula Kártya -->
+                <div id="l1-card" class="bg-gradient-to-br from-sky-50 to-indigo-50 border-2 border-sky-200 rounded-2xl p-5 text-center mb-5 shadow-inner">
+                    <div id="l1-svg" class="w-20 h-20 mx-auto mb-3 flex items-center justify-center"></div>
+                    <h2 id="l1-name" class="text-xl sm:text-2xl font-black text-slate-800 mb-1">Szőlőcukor (Glükóz)</h2>
+                    <div id="l1-formula" class="inline-block bg-white/80 text-sky-900 font-mono text-xs sm:text-sm font-bold px-3 py-0.5 rounded-lg border border-sky-200 mb-2">
+                        C₆H₁₂O₆
+                    </div>
+                    <p id="l1-desc" class="text-sm sm:text-base text-slate-700 font-semibold">
+                        A sejtek legfőbb, gyorsan mobilizálható energiaforrása.
+                    </p>
+                </div>
+
+                <!-- Válasz gombok (mobilbarát, nagy érintési felület) -->
+                <div id="l1-options" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <!-- JS tölti fel -->
+                </div>
+            </section>
+
+            <!-- 3. SZINT 2: INTERAKTÍV NÖVÉNYI SEJT -->
+            <section id="screen-level-2" class="hidden bg-white rounded-3xl shadow-xl border-2 border-emerald-100 p-4 sm:p-6 animate-pop">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="bg-emerald-100 text-emerald-800 text-xs font-extrabold px-3 py-1 rounded-full">
+                        🔬 2. Küldetés: Sejttérkép
+                    </span>
+                    <span id="l2-counter" class="text-xs font-bold text-slate-500">1 / 5</span>
+                </div>
+
+                <!-- Kérdés / Feladat sáv -->
+                <div class="bg-amber-50 border-2 border-amber-200 rounded-2xl p-3.5 mb-4 text-center">
+                    <div class="text-xs font-extrabold uppercase tracking-wider text-amber-700 mb-1">
+                        Koppints a megfelelő sejtalkotóra a rajzon vagy a gombokon!
+                    </div>
+                    <p id="l2-prompt" class="text-sm sm:text-base font-extrabold text-slate-800">
+                        Keresd meg a sejt "irányítóközpontját", amely az örökítőanyagot (DNS-t) rejti!
+                    </p>
+                </div>
+
+                <!-- Interaktív Növényi Sejt SVG -->
+                <div class="relative w-full max-w-[360px] mx-auto mb-4 bg-emerald-950/5 rounded-2xl p-2 border border-emerald-100">
+                    <svg viewBox="0 0 400 320" class="w-full h-auto select-none">
+                        <!-- 1. Sejtfal (Külső hatszögletű keret) -->
+                        <g id="org-cellwall" class="organelle" onclick="handleOrganellePick('cellwall')">
+                            <polygon points="60,20 340,20 385,160 340,300 60,300 15,160" 
+                                fill="#059669" stroke="#064e3b" stroke-width="8" stroke-linejoin="round"/>
+                            <polygon points="75,36 325,36 366,160 325,284 75,284 34,160" 
+                                fill="#a7f3d0" stroke="#10b981" stroke-width="6" stroke-linejoin="round"/>
+                            <circle cx="48" cy="60" r="13" fill="#064e3b"/>
+                            <text x="48" y="65" text-anchor="middle" fill="white" font-size="14" font-weight="900">1</text>
+                        </g>
+
+                        <!-- 2. Sejtplazma (Belső tér) -->
+                        <g id="org-cytoplasm" class="organelle" onclick="handleOrganellePick('cytoplasm')">
+                            <polygon points="82,44 318,44 356,160 318,276 82,276 44,160" 
+                                fill="#dcfce7" stroke="#86efac" stroke-width="2"/>
+                            <circle cx="315" cy="240" r="13" fill="#15803d"/>
+                            <text x="315" y="245" text-anchor="middle" fill="white" font-size="14" font-weight="900">5</text>
+                        </g>
+
+                        <!-- 3. Sejtnedvvel telt üreg (Vakuólum) -->
+                        <g id="org-vacuole" class="organelle" onclick="handleOrganellePick('vacuole')">
+                            <path d="M 195,65 C 285,55 320,105 305,175 C 290,235 210,230 190,180 C 175,140 165,70 195,65 Z" 
+                                fill="#7dd3fc" stroke="#0284c7" stroke-width="4" opacity="0.9"/>
+                            <path d="M 215,90 C 245,85 270,105 265,135" stroke="#e0f2fe" stroke-width="4" fill="none" stroke-linecap="round"/>
+                            <circle cx="250" cy="145" r="14" fill="#0369a1"/>
+                            <text x="250" y="150" text-anchor="middle" fill="white" font-size="14" font-weight="900">3</text>
+                        </g>
+
+                        <!-- 4. Sejtmag -->
+                        <g id="org-nucleus" class="organelle" onclick="handleOrganellePick('nucleus')">
+                            <circle cx="125" cy="125" r="42" fill="#c084fc" stroke="#7e22ce" stroke-width="5"/>
+                            <circle cx="115" cy="115" r="14" fill="#6b21a8"/>
+                            <path d="M 105,145 Q 130,160 148,135" stroke="#f3e8ff" stroke-width="3" fill="none" stroke-linecap="round"/>
+                            <circle cx="125" cy="125" r="14" fill="#581c87"/>
+                            <text x="125" y="130" text-anchor="middle" fill="white" font-size="14" font-weight="900">2</text>
+                        </g>
+
+                        <!-- 5. Zöld színtestek (Kloroplasztiszok) -->
+                        <g id="org-chloroplast" class="organelle" onclick="handleOrganellePick('chloroplast')">
+                            <!-- Színtest 1 -->
+                            <ellipse cx="125" cy="225" rx="34" ry="20" fill="#22c55e" stroke="#14532d" stroke-width="4"/>
+                            <line x1="108" y1="215" x2="108" y2="235" stroke="#14532d" stroke-width="5" stroke-linecap="round"/>
+                            <line x1="125" y1="212" x2="125" y2="238" stroke="#14532d" stroke-width="5" stroke-linecap="round"/>
+                            <line x1="142" y1="215" x2="142" y2="235" stroke="#14532d" stroke-width="5" stroke-linecap="round"/>
+                            <!-- Színtest 2 -->
+                            <ellipse cx="220" cy="245" rx="28" ry="16" transform="rotate(-12 220 245)" fill="#22c55e" stroke="#14532d" stroke-width="3.5"/>
+                            <circle cx="125" cy="225" r="14" fill="#14532d"/>
+                            <text x="125" y="230" text-anchor="middle" fill="white" font-size="14" font-weight="900">4</text>
+                        </g>
+
+                        <!-- Díszítő mitokondrium (nem kérdezett, de szép) -->
+                        <ellipse cx="185" cy="70" rx="18" ry="10" transform="rotate(25 185 70)" fill="#fb923c" stroke="#9a3412" stroke-width="2.5" pointer-events="none"/>
+                        <polyline points="172,70 180,66 185,74 192,67 198,72" fill="none" stroke="#9a3412" stroke-width="2" pointer-events="none"/>
+                    </svg>
+                </div>
+
+                <!-- Gyorsválasztó gombok a biztos mobilos elérésért -->
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    <button id="btn-org-cellwall" onclick="handleOrganellePick('cellwall')" class="btn-game bg-emerald-100 hover:bg-emerald-200 text-emerald-950 font-extrabold text-xs sm:text-sm py-2.5 px-3 rounded-xl border border-emerald-300 flex items-center gap-2">
+                        <span class="bg-emerald-800 text-white w-5 h-5 rounded-full text-xs flex items-center justify-center shrink-0">1</span>
+                        <span>Sejtfal</span>
+                    </button>
+                    <button id="btn-org-nucleus" onclick="handleOrganellePick('nucleus')" class="btn-game bg-purple-100 hover:bg-purple-200 text-purple-950 font-extrabold text-xs sm:text-sm py-2.5 px-3 rounded-xl border border-purple-300 flex items-center gap-2">
+                        <span class="bg-purple-800 text-white w-5 h-5 rounded-full text-xs flex items-center justify-center shrink-0">2</span>
+                        <span>Sejtmag</span>
+                    </button>
+                    <button id="btn-org-vacuole" onclick="handleOrganellePick('vacuole')" class="btn-game bg-sky-100 hover:bg-sky-200 text-sky-950 font-extrabold text-xs sm:text-sm py-2.5 px-3 rounded-xl border border-sky-300 flex items-center gap-2">
+                        <span class="bg-sky-800 text-white w-5 h-5 rounded-full text-xs flex items-center justify-center shrink-0">3</span>
+                        <span>Sejtnedvüreg</span>
+                    </button>
+                    <button id="btn-org-chloroplast" onclick="handleOrganellePick('chloroplast')" class="btn-game bg-green-100 hover:bg-green-200 text-green-950 font-extrabold text-xs sm:text-sm py-2.5 px-3 rounded-xl border border-green-400 flex items-center gap-2">
+                        <span class="bg-green-900 text-white w-5 h-5 rounded-full text-xs flex items-center justify-center shrink-0">4</span>
+                        <span>Zöld színtest</span>
+                    </button>
+                    <button id="btn-org-cytoplasm" onclick="handleOrganellePick('cytoplasm')" class="btn-game col-span-2 sm:col-span-1 bg-teal-50 hover:bg-teal-100 text-teal-950 font-extrabold text-xs sm:text-sm py-2.5 px-3 rounded-xl border border-teal-300 flex items-center justify-center sm:justify-start gap-2">
+                        <span class="bg-teal-800 text-white w-5 h-5 rounded-full text-xs flex items-center justify-center shrink-0">5</span>
+                        <span>Sejtplazma</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- 4. SZINT 3: FOTOSZINTÉZIS GYÁR -->
+            <section id="screen-level-3" class="hidden bg-white rounded-3xl shadow-xl border-2 border-amber-100 p-4 sm:p-6 animate-pop">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="bg-amber-100 text-amber-800 text-xs font-extrabold px-3 py-1 rounded-full">
+                        ☀️ 3. Küldetés: Fotoszintézis Gyár
+                    </span>
+                    <span id="l3-step-badge" class="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg">
+                        1. lépés / 2
+                    </span>
+                </div>
+
+                <h2 id="l3-title" class="text-lg sm:text-xl font-black text-slate-800 mb-1">
+                    1. Fázis: Mire van szüksége a növénynek?
+                </h2>
+                <p id="l3-subtitle" class="text-xs sm:text-sm text-slate-600 mb-4">
+                    Válaszd ki azt a <strong>3 kiindulási tényezőt (felvett anyagot és energiát)</strong>, amely nélkül nem indulhat el a fotoszintézis!
+                </p>
+
+                <!-- Vizuális Levél Labor -->
+                <div class="bg-gradient-to-r from-amber-50 via-emerald-50 to-sky-50 border-2 border-emerald-200 rounded-2xl p-3 sm:p-4 mb-4">
+                    <div class="flex flex-col sm:flex-row items-center justify-between gap-3">
+                        <!-- Bemeneti slotok -->
+                        <div class="w-full sm:w-2/5">
+                            <div class="text-xs font-extrabold uppercase text-emerald-800 mb-1.5 text-center">
+                                📥 Felvett (3 db)
+                            </div>
+                            <div id="l3-inputs-box" class="flex flex-wrap justify-center gap-1.5 min-h-[44px] bg-white/80 p-2 rounded-xl border border-emerald-200">
+                                <span class="text-xs text-slate-400 italic self-center">Válassz alulról...</span>
+                            </div>
+                        </div>
+
+                        <!-- Középső Levél SVG -->
+                        <div class="flex flex-col items-center shrink-0">
+                            <div class="w-14 h-14 rounded-full bg-emerald-500 text-white flex items-center justify-center text-2xl shadow-md animate-glow">
+                                🌿
+                            </div>
+                            <span class="text-[11px] font-black text-emerald-900 mt-1">ZÖLD SZÍNTEST</span>
+                        </div>
+
+                        <!-- Kimeneti slotok -->
+                        <div class="w-full sm:w-2/5">
+                            <div class="text-xs font-extrabold uppercase text-sky-800 mb-1.5 text-center">
+                                📤 Keletkező (2 db)
+                            </div>
+                            <div id="l3-outputs-box" class="flex flex-wrap justify-center gap-1.5 min-h-[44px] bg-white/80 p-2 rounded-xl border border-sky-200">
+                                <span class="text-xs text-slate-400 italic self-center">2. lépésben...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Választható elemek gombjai -->
+                <div id="l3-choices" class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                    <!-- JS generálja -->
+                </div>
+            </section>
+
+            <!-- 5. SZINT 4: POPULÁCIÓ ÉS ÖKOLÓGIA -->
+            <section id="screen-level-4" class="hidden bg-white rounded-3xl shadow-xl border-2 border-purple-100 p-4 sm:p-6 animate-pop">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="bg-purple-100 text-purple-800 text-xs font-extrabold px-3 py-1 rounded-full">
+                        🦊 4. Küldetés: Populációk és Ökoszisztéma
+                    </span>
+                    <span id="l4-counter" class="text-xs font-bold text-slate-500">1 / 4</span>
+                </div>
+
+                <!-- Tápláléklánc és Populáció illusztráció -->
+                <div class="bg-gradient-to-r from-green-50 via-amber-50 to-orange-50 border-2 border-purple-100 rounded-2xl p-3.5 mb-4">
+                    <div class="flex items-center justify-around text-center">
+                        <div>
+                            <div class="text-2xl sm:text-3xl">🌱</div>
+                            <div class="text-[11px] font-bold text-emerald-800">Fű (Termelő)</div>
+                        </div>
+                        <div class="text-slate-400 font-black">➔</div>
+                        <div>
+                            <div class="text-2xl sm:text-3xl">🐇</div>
+                            <div class="text-[11px] font-bold text-amber-800">Mezei nyúl</div>
+                        </div>
+                        <div class="text-slate-400 font-black">➔</div>
+                        <div>
+                            <div class="text-2xl sm:text-3xl">🦊</div>
+                            <div class="text-[11px] font-bold text-orange-800">Vörös róka</div>
+                        </div>
+                    </div>
+                </div>
+
+                <h2 id="l4-question" class="text-base sm:text-lg font-extrabold text-slate-800 mb-4 leading-snug">
+                    Kérdés helye...
+                </h2>
+
+                <div id="l4-options" class="flex flex-col gap-2.5">
+                    <!-- JS tölti fel -->
+                </div>
+            </section>
+
+            <!-- 6. GYŐZELEM / ÖSSZEGZŐ KÉPERNYŐ -->
+            <section id="screen-result" class="hidden bg-white rounded-3xl shadow-xl border-2 border-emerald-200 p-6 sm:p-8 text-center animate-pop">
+                <div id="result-emoji" class="text-6xl sm:text-7xl mb-3 animate-float">🏆</div>
+                <span id="result-rank" class="inline-block bg-amber-100 text-amber-800 font-black text-xs sm:text-sm px-4 py-1 rounded-full mb-2 uppercase">
+                    Mester Biológus!
+                </span>
+                <h1 id="result-title" class="text-2xl sm:text-3xl font-black text-emerald-950 mb-2">
+                    Gratulálok! Megmentetted a Biodómot!
+                </h1>
+                <p id="result-desc" class="text-slate-600 text-sm sm:text-base mb-6 max-w-md mx-auto">
+                    Kiválóan ismered a 7. osztályos biológia alapjait a molekuláktól egészen a populációkig!
+                </p>
+
+                <!-- Statisztika kártyák -->
+                <div class="grid grid-cols-2 gap-3 max-w-sm mx-auto mb-6">
+                    <div class="bg-amber-50 border-2 border-amber-200 rounded-2xl p-3">
+                        <div class="text-xs font-bold text-amber-700 uppercase">Összpontszám</div>
+                        <div id="result-score" class="text-2xl sm:text-3xl font-black text-amber-900">0</div>
+                    </div>
+                    <div class="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-3">
+                        <div class="text-xs font-bold text-emerald-700 uppercase">Megmaradt élet</div>
+                        <div id="result-lives" class="text-2xl sm:text-3xl font-black text-emerald-900">❤️❤️❤️</div>
+                    </div>
+                </div>
+
+                <!-- Tudástár összefoglaló -->
+                <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-left text-xs sm:text-sm text-slate-700 mb-6 space-y-1.5">
+                    <div class="font-extrabold text-slate-900 mb-1">📚 Amit ma átismételtél:</div>
+                    <div>• <strong>Szerves molekulák:</strong> szénhidrátok (energia), fehérjék (felépítés), lipidek (raktár), DNS (örökítés).</div>
+                    <div>• <strong>Növényi sejt:</strong> sejtfal, zöld színtest és sejtnedvvel telt üreg különbözteti meg az állatitól.</div>
+                    <div>• <strong>Fotoszintézis:</strong> CO₂ + H₂O + fényenergia ➔ Szőlőcukor + O₂.</div>
+                    <div>• <strong>Populáció:</strong> egy fajba tartozó, egy helyen és egy időben élő egyedek közössége.</div>
+                </div>
+
+                <button onclick="startGame()" class="btn-game w-full sm:w-auto min-w-[220px] bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-black text-base sm:text-lg py-3.5 px-8 rounded-2xl">
+                    🔄 Újrajátszás
+                </button>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- AZONNALI VISSZAJELZŐ PANEL (MODAL / SHEET) -->
+    <div id="feedback-modal" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-3">
+        <div id="feedback-box" class="bg-white w-full max-w-md rounded-3xl p-5 sm:p-6 shadow-2xl border-4 animate-pop">
+            <div class="flex items-start gap-3.5 mb-3">
+                <div id="feedback-icon" class="text-3xl sm:text-4xl shrink-0">✅</div>
+                <div>
+                    <h3 id="feedback-title" class="text-lg sm:text-xl font-black">Helyes válasz!</h3>
+                    <p id="feedback-text" class="text-sm sm:text-base text-slate-700 mt-1 leading-relaxed">
+                        Magyarázat helye...
+                    </p>
+                </div>
+            </div>
+            <button id="feedback-btn" onclick="closeFeedback()" class="btn-game w-full font-black text-white py-3.5 rounded-2xl text-base mt-2">
+                Tovább ➔
+            </button>
+        </div>
+    </div>
+
+    <footer class="text-center py-3 text-xs text-slate-500 font-semibold">
+        BioKaland • 7. osztályos interaktív biológia oktatójáték
+    </footer>
+
+    <script>
+        /* ==========================================
+           1. WEB AUDIO API HANGGENERÁTOR (KÜLSŐ FÁJL NÉLKÜL)
+           ========================================== */
+        let audioCtx = null;
+        let soundEnabled = true;
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (AudioContext) audioCtx = new AudioContext();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            document.getElementById('btn-sound').textContent = soundEnabled ? '🔊' : '🔇';
+            if (soundEnabled) playSound('click');
+        }
+
+        function playSound(type) {
+            if (!soundEnabled) return;
+            try {
+                initAudio();
+                if (!audioCtx) return;
+
+                const now = audioCtx.currentTime;
+
+                if (type === 'click') {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(520, now);
+                    osc.frequency.exponentialRampToValueAtTime(680, now + 0.06);
+                    gain.gain.setValueAtTime(0.12, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.06);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.06);
+                } else if (type === 'correct') {
+                    const notes = [523.25, 659.25, 783.99, 1046.5]; // C5 - E5 - G5 - C6
+                    notes.forEach((freq, idx) => {
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(freq, now + idx * 0.07);
+                        gain.gain.setValueAtTime(0.18, now + idx * 0.07);
+                        gain.gain.exponentialRampToValueAtTime(0.008, now + idx * 0.07 + 0.22);
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.start(now + idx * 0.07);
+                        osc.stop(now + idx * 0.07 + 0.22);
+                    });
+                } else if (type === 'wrong') {
+                    const notes = [300, 220];
+                    notes.forEach((freq, idx) => {
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.type = 'sawtooth';
+                        osc.frequency.setValueAtTime(freq, now + idx * 0.14);
+                        gain.gain.setValueAtTime(0.12, now + idx * 0.14);
+                        gain.gain.exponentialRampToValueAtTime(0.008, now + idx * 0.14 + 0.2);
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.start(now + idx * 0.14);
+                        osc.stop(now + idx * 0.14 + 0.2);
+                    });
+                } else if (type === 'levelup') {
+                    const notes = [440, 554.37, 659.25, 880];
+                    notes.forEach((freq, idx) => {
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(freq, now + idx * 0.09);
+                        gain.gain.setValueAtTime(0.2, now + idx * 0.09);
+                        gain.gain.exponentialRampToValueAtTime(0.008, now + idx * 0.09 + 0.3);
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.start(now + idx * 0.09);
+                        osc.stop(now + idx * 0.09 + 0.3);
+                    });
+                }
+            } catch (e) {
+                console.warn('Audio hiba:', e);
+            }
+        }
+
+        /* ==========================================
+           2. TANANYAG ADATBÁZIS (7. OSZTÁLY BIOLÓGIA)
+           ========================================== */
+
+        // 1. SZINT: Molekulák
+        const level1Data = [
+            {
+                name: "Szőlőcukor (Glükóz)",
+                formula: "C₆H₁₂O₆",
+                desc: "A fotoszintézis során keletkezik, a sejtek legfőbb energiaforrása.",
+                correct: "Szénhidrát (Szerves)",
+                options: ["Szénhidrát (Szerves)", "Fehérje (Szerves)", "Szervetlen molekula", "Zsírszerű anyag (Lipid)"],
+                explanation: "A szőlőcukor és a keményítő a szénhidrátok közé tartozik. Ezek a sejtek legfontosabb, gyorsan felhasználható energiaforrásai!",
+                svg: `<svg viewBox="0 0 80 80" class="w-16 h-16"><polygon points="40,10 68,26 68,54 40,70 12,54 12,26" fill="#fef08a" stroke="#ca8a04" stroke-width="4"/><text x="40" y="45" text-anchor="middle" fill="#854d0e" font-weight="900" font-size="14">GLÜKÓZ</text></svg>`
+            },
+            {
+                name: "Víz",
+                formula: "H₂O",
+                desc: "A sejtek legnagyobb részét alkotja: kiváló oldószer és reakcióközeg.",
+                correct: "Szervetlen molekula",
+                options: ["Szervetlen molekula", "Szénhidrát (Szerves)", "Fehérje (Szerves)", "Örökítőanyag (DNS)"],
+                explanation: "A víz (H₂O) és a szén-dioxid (CO₂) szervetlen molekulák, de nélkülözhetetlenek az élőlények működéséhez!",
+                svg: `<svg viewBox="0 0 80 80" class="w-16 h-16"><circle cx="40" cy="46" r="18" fill="#38bdf8" stroke="#0284c7" stroke-width="3"/><circle cx="20" cy="26" r="11" fill="#e0f2fe" stroke="#0284c7" stroke-width="3"/><circle cx="60" cy="26" r="11" fill="#e0f2fe" stroke="#0284c7" stroke-width="3"/></svg>`
+            },
+            {
+                name: "Enzimek és Izomrost-alkotók",
+                formula: "Aminosav-láncok",
+                desc: "Felépítik a sejteket és irányítják a biokémiai folyamatokat.",
+                correct: "Fehérje (Szerves)",
+                options: ["Fehérje (Szerves)", "Szénhidrát (Szerves)", "Szervetlen ásványi só", "Lipid (Zsír)"],
+                explanation: "A fehérjék aminosavakból épülnek fel. Felépítik a testünket, és enzimként irányítják a sejtek folyamatait!",
+                svg: `<svg viewBox="0 0 80 80" class="w-16 h-16"><circle cx="18" cy="40" r="10" fill="#f472b6"/><circle cx="34" cy="26" r="10" fill="#ec4899"/><circle cx="50" cy="50" r="10" fill="#db2777"/><circle cx="64" cy="34" r="10" fill="#be185d"/></svg>`
+            },
+            {
+                name: "DNS (Dezoxiribonukleinsav)",
+                formula: "Kettős spirál",
+                desc: "A sejtmagban található óriásmolekula, amely a tulajdonságok tervrajzát őrzi.",
+                correct: "Örökítőanyag (Nukleinsav)",
+                options: ["Örökítőanyag (Nukleinsav)", "Szervetlen gáz", "Szénhidrát (Szerves)", "Tartalék zsír (Lipid)"],
+                explanation: "A DNS (nukleinsav) tárolja és adja tovább az utódoknak az öröklődő információkat!",
+                svg: `<svg viewBox="0 0 80 80" class="w-16 h-16"><path d="M20,15 Q60,40 20,65" fill="none" stroke="#9333ea" stroke-width="5" stroke-linecap="round"/><path d="M60,15 Q20,40 60,65" fill="none" stroke="#3b82f6" stroke-width="5" stroke-linecap="round"/><line x1="28" y1="24" x2="52" y2="24" stroke="#cbd5e1" stroke-width="3"/><line x1="28" y1="56" x2="52" y2="56" stroke="#cbd5e1" stroke-width="3"/></svg>`
+            },
+            {
+                name: "Olajok, zsírok és viaszok",
+                formula: "Hidrofób molekulák",
+                desc: "Vízben nem oldódnak, tartalék tápanyagok és a sejthártya fontos építőkövei.",
+                correct: "Lipidek (Zsírszerű anyagok)",
+                options: ["Lipidek (Zsírszerű anyagok)", "Szervetlen molekulák", "Fehérjék", "Nukleinsavak"],
+                explanation: "A lipidek (zsírok, olajok) kiváló energiaraktárak, hőszigetelők és a sejthártyák alapvető építőelemei!",
+                svg: `<svg viewBox="0 0 80 80" class="w-16 h-16"><path d="M40,12 C40,12 64,40 64,54 C64,67 53,74 40,74 C27,74 16,67 16,54 C16,40 40,12 40,12 Z" fill="#fbbf24" stroke="#d97706" stroke-width="3"/></svg>`
+            }
+        ];
+
+        // 2. SZINT: Sejttérkép
+        const level2Data = [
+            {
+                target: "chloroplast",
+                prompt: "Keresd meg azt a zöld sejtszervecskét, amely befogja a napfényt és elvégzi a fotoszintézist!",
+                name: "Zöld színtest (Kloroplasztisz)",
+                explanation: "A zöld színtestek csak a növényi sejtekben találhatók meg. Bennük zajlik a fotoszintézis, amely során napfény segítségével szőlőcukor keletkezik!"
+            },
+            {
+                target: "nucleus",
+                prompt: "Koppints a sejt irányítóközpontjára, amely a DNS-t (örökítőanyagot) tartalmazza!",
+                name: "Sejtmag",
+                explanation: "A valódi sejtmag (nukleusz) védi az örökítőanyagot (DNS-t) és irányítja a sejt életfolyamatait!"
+            },
+            {
+                target: "cellwall",
+                prompt: "Melyik szilárd külső burok ad határozott alakot és védelmet a növényi sejtnek? (Állati sejtben nincs ilyen!)",
+                name: "Sejtfal",
+                explanation: "A cellulózból álló sejtfal kívülről határolja, védi és merevíti a növényi sejtet!"
+            },
+            {
+                target: "vacuole",
+                prompt: "Keresd meg a nagy, folyadékkal teli raktárt, amely a víz és az oldott anyagok tárolásáért felel!",
+                name: "Sejtnedvvel telt üreg (Vakuólum)",
+                explanation: "A sejtnedvvel telt üreg vizet, ásványi sókat vagy akár színanyagokat raktároz, és segít feszesen tartani a növényi sejtet!"
+            },
+            {
+                target: "cytoplasm",
+                prompt: "Melyik kocsonyás alapállomány tölti ki a sejt belsejét és ágyazza be a sejtszervecskéket?",
+                name: "Sejtplazma",
+                explanation: "A sejtplazma magas víztartalmú, kocsonyás anyag, amelyben a sejtszervecskék elhelyezkednek és a lebontó folyamatok zajlanak."
+            }
+        ];
+
+        // 3. SZINT: Fotoszintézis Gyár
+        const level3ChoicesData = [
+            { id: "co2", label: "Szén-dioxid (CO₂)", icon: "💨", role: "input", explain: "A növény a gázcserenyílásokon át veszi fel a levegőből a szén-dioxidot." },
+            { id: "h2o", label: "Víz (H₂O)", icon: "💧", role: "input", explain: "A gyökereken keresztül felszívott víz elengedhetetlen kiindulási anyag." },
+            { id: "light", label: "Fényenergia", icon: "☀️", role: "input", explain: "A Nap fényenergiáját a zöld színtestek klorofill molekulái kötik meg." },
+            { id: "glucose", label: "Szőlőcukor (Szerves)", icon: "🍬", role: "output", explain: "A szőlőcukor a fotoszintézis fő terméke, amelyből a növény felépíti önmagát." },
+            { id: "o2", label: "Oxigén (O₂)", icon: "🫧", role: "output", explain: "Az oxigén a fotoszintézis során keletkezik, és a levegőbe kerül – ezt lélegezzük be mi is!" },
+            { id: "soil", label: "Humusz (Szerves talaj)", icon: "🪨", role: "distractor", explain: "Vigyázat! A növények autotróf élőlények: NEM kész szerves humuszt esznek, hanem maguk állítják elő a szerves anyagot!" }
+        ];
+
+        // 4. SZINT: Populáció és Ökológia
+        const level4Data = [
+            {
+                question: "Mit nevezünk a biológiában POPULÁCIÓNAK (népességnek)?",
+                options: [
+                    "Az egy fajba tartozó, egy adott területen és egy időben ténylegesen együtt élő egyedek közösségét.",
+                    "Egy erdőben élő összes növény-, gomba- és állatfajt együttvéve.",
+                    "A Földön élő összes vörös rókát, kontinensektől függetlenül."
+                ],
+                correctIndex: 0,
+                explanation: "Populációnak (népességnek) az azonos fajba tartozó, adott helyen és időben együtt élő, egymással szaporodni képes egyedek összességét nevezzük!"
+            },
+            {
+                question: "A réten a Fű ➔ Mezei nyúl ➔ Vörös róka táplálékláncban mi történik rövid távon a nyúlpopulációval, ha a rókák száma hirtelen lecsökken?",
+                options: [
+                    "A mezei nyulak egyedszáma megnő, mert kevesebb a ragadozójuk.",
+                    "A mezei nyulak azonnal kipusztulnak a rókák nélkül.",
+                    "A nyulak átalakulnak ragadozóvá."
+                ],
+                correctIndex: 0,
+                explanation: "Ha a ragadozók (rókák) száma csökken, a zsákmányállatok (nyulak) populációja átmenetileg elszaporodik, amíg a táplálék (fű) el nem fogy!"
+            },
+            {
+                question: "Milyen ökológiai szerepet töltenek be a zöld növények az életközösségben?",
+                options: [
+                    "Termelők (autotrófok), mert szervetlen anyagokból napfénnyel szerves anyagot állítanak elő.",
+                    "Elsődleges fogyasztók, mert a talaj szerves anyagait falják fel.",
+                    "Lebontók, mert elpusztult élőlényeket bontanak le."
+                ],
+                correctIndex: 0,
+                explanation: "A zöld növények a termelők: fotoszintézissel szervetlen anyagból (CO₂ és H₂O) szerves anyagot (szőlőcukrot) állítanak elő, megalapozva a táplálékláncot."
+            },
+            {
+                question: "Milyen kölcsönhatás (kapcsolat) van két mezei nyúl között, ha ugyanazért a dús fűcsomóért küzdenek a réten?",
+                options: [
+                    "Versengés (konkurencia) a táplálékért.",
+                    "Együttélés (szimbiózis), mert mindkettőnek előnyös.",
+                    "Élősködés (parazitizmus)."
+                ],
+                correctIndex: 0,
+                explanation: "Amikor az egyedek ugyanazért a korlátozott forrásért (táplálékért, búvóhelyért) küzdenek, azt versengésnek (konkurenciának) nevezzük!"
+            }
+        ];
+
+        /* ==========================================
+           3. JÁTÉKÁLLAPOT ÉS VEZÉRLÉS
+           ========================================== */
+        let score = 0;
+        let lives = 3;
+        let currentLevel = 1;
+        let stepIndex = 0;
+        let nextActionCallback = null;
+
+        // Szint 3 specifikus állapot
+        let l3Phase = 1; // 1 = bemenetek (3 db), 2 = kimenetek (2 db)
+        let l3PickedInputs = [];
+        let l3PickedOutputs = [];
+
+        function showScreen(screenId) {
+            const screens = ['screen-start', 'screen-level-1', 'screen-level-2', 'screen-level-3', 'screen-level-4', 'screen-result'];
+            screens.forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+            document.getElementById(screenId).classList.remove('hidden');
+        }
+
+        function updateHUD() {
+            const titles = {
+                1: "Molekula Műhely",
+                2: "Növényi Sejttérkép",
+                3: "Fotoszintézis Gyár",
+                4: "Populációk világa"
+            };
+            document.getElementById('hud-level-badge').textContent = `${currentLevel}/4. SZINT`;
+            document.getElementById('hud-level-title').textContent = titles[currentLevel] || "";
+            document.getElementById('hud-score').textContent = score;
+            document.getElementById('hud-lives').textContent = lives > 0 ? "❤️".repeat(lives) : "💔";
+
+            // Haladás kiszámítása (összesen 16 lépés a 4 szinten)
+            const totalSteps = 5 + 5 + 2 + 4;
+            let completed = 0;
+            if (currentLevel === 1) completed = stepIndex;
+            if (currentLevel === 2) completed = 5 + stepIndex;
+            if (currentLevel === 3) completed = 10 + (l3Phase - 1);
+            if (currentLevel === 4) completed = 12 + stepIndex;
+
+            const pct = Math.min(100, Math.max(6, Math.round((completed / totalSteps) * 100)));
+            document.getElementById('hud-progress').style.width = pct + "%";
+        }
+
+        function startGame() {
+            playSound('click');
+            score = 0;
+            lives = 3;
+            currentLevel = 1;
+            stepIndex = 0;
+
+            document.getElementById('hud').classList.remove('hidden');
+            loadLevel1();
+        }
+
+        function showFeedback(isCorrect, title, explanation, callback) {
+            const modal = document.getElementById('feedback-modal');
+            const box = document.getElementById('feedback-box');
+            const icon = document.getElementById('feedback-icon');
+            const titleEl = document.getElementById('feedback-title');
+            const textEl = document.getElementById('feedback-text');
+            const btn = document.getElementById('feedback-btn');
+
+            nextActionCallback = callback;
+
+            if (isCorrect) {
+                box.className = "bg-white w-full max-w-md rounded-3xl p-5 sm:p-6 shadow-2xl border-4 border-emerald-400 animate-pop";
+                icon.textContent = "🌟";
+                titleEl.textContent = title || "Szuper válasz!";
+                titleEl.className = "text-lg sm:text-xl font-black text-emerald-800";
+                btn.className = "btn-game w-full font-black text-white py-3.5 rounded-2xl text-base mt-2 bg-emerald-600 hover:bg-emerald-700";
+            } else {
+                box.className = "bg-white w-full max-w-md rounded-3xl p-5 sm:p-6 shadow-2xl border-4 border-rose-400 animate-shake";
+                icon.textContent = "💡";
+                titleEl.textContent = title || "Majdnem! Nézzük meg, miért:";
+                titleEl.className = "text-lg sm:text-xl font-black text-rose-800";
+                btn.className = "btn-game w-full font-black text-white py-3.5 rounded-2xl text-base mt-2 bg-rose-600 hover:bg-rose-700";
+            }
+
+            textEl.textContent = explanation;
+            modal.classList.remove('hidden');
+        }
+
+        function closeFeedback() {
+            playSound('click');
+            document.getElementById('feedback-modal').classList.add('hidden');
+            if (typeof nextActionCallback === 'function') {
+                const cb = nextActionCallback;
+                nextActionCallback = null;
+                cb();
+            }
+        }
+
+        /* ==========================================
+           4. SZINT 1 LOGIKA: MOLEKULÁK
+           ========================================== */
+        function loadLevel1() {
+            currentLevel = 1;
+            showScreen('screen-level-1');
+            renderLevel1Step();
+        }
+
+        function renderLevel1Step() {
+            updateHUD();
+            const item = level1Data[stepIndex];
+            document.getElementById('l1-counter').textContent = `${stepIndex + 1} / ${level1Data.length}`;
+            document.getElementById('l1-svg').innerHTML = item.svg;
+            document.getElementById('l1-name').textContent = item.name;
+            document.getElementById('l1-formula').textContent = item.formula;
+            document.getElementById('l1-desc').textContent = item.desc;
+
+            // Opciók keverése
+            const shuffled = [...item.options].sort(() => Math.random() - 0.5);
+            const container = document.getElementById('l1-options');
+            container.innerHTML = '';
+
+            shuffled.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = "btn-game bg-sky-50 hover:bg-sky-100 border-2 border-sky-200 text-sky-950 font-extrabold text-sm sm:text-base py-3.5 px-4 rounded-2xl text-center";
+                btn.textContent = opt;
+                btn.onclick = () => checkLevel1Answer(opt);
+                container.appendChild(btn);
+            });
+        }
+
+        function checkLevel1Answer(selected) {
+            const item = level1Data[stepIndex];
+            const isCorrect = selected === item.correct;
+
+            if (isCorrect) {
+                score += 100;
+                playSound('correct');
+            } else {
+                lives = Math.max(0, lives - 1);
+                playSound('wrong');
+            }
+            updateHUD();
+
+            showFeedback(
+                isCorrect,
+                isCorrect ? "Pontosan! +100 pont" : `A helyes válasz: ${item.correct}`,
+                item.explanation,
+                () => {
+                    stepIndex++;
+                    if (stepIndex < level1Data.length) {
+                        renderLevel1Step();
+                    } else {
+                        playSound('levelup');
+                        stepIndex = 0;
+                        loadLevel2();
+                    }
+                }
+            );
+        }
+
+        /* ==========================================
+           5. SZINT 2 LOGIKA: SEJTTÉRKÉP
+           ========================================== */
+        function loadLevel2() {
+            currentLevel = 2;
+            stepIndex = 0;
+            showScreen('screen-level-2');
+
+            // Minden sejtszervecske visszaállítása aktívra
+            ['cellwall', 'nucleus', 'vacuole', 'chloroplast', 'cytoplasm'].forEach(id => {
+                document.getElementById('org-' + id).classList.remove('organelle-found');
+                const btn = document.getElementById('btn-org-' + id);
+                btn.disabled = false;
+                btn.classList.remove('opacity-40');
+            });
+
+            renderLevel2Step();
+        }
+
+        function renderLevel2Step() {
+            updateHUD();
+            const item = level2Data[stepIndex];
+            document.getElementById('l2-counter').textContent = `${stepIndex + 1} / ${level2Data.length}`;
+            document.getElementById('l2-prompt').textContent = item.prompt;
+        }
+
+        function handleOrganellePick(pickedId) {
+            const item = level2Data[stepIndex];
+            const isCorrect = pickedId === item.target;
+
+            if (isCorrect) {
+                score += 120;
+                playSound('correct');
+
+                // Megtalált szervecske halványítása
+                document.getElementById('org-' + pickedId).classList.add('organelle-found');
+                const btn = document.getElementById('btn-org-' + pickedId);
+                btn.disabled = true;
+                btn.classList.add('opacity-40');
+
+                updateHUD();
+                showFeedback(
+                    true,
+                    `Megvan: ${item.name}! (+120 pont)`,
+                    item.explanation,
+                    () => {
+                        stepIndex++;
+                        if (stepIndex < level2Data.length) {
+                            renderLevel2Step();
+                        } else {
+                            playSound('levelup');
+                            loadLevel3();
+                        }
+                    }
+                );
+            } else {
+                lives = Math.max(0, lives - 1);
+                playSound('wrong');
+                updateHUD();
+                showFeedback(
+                    false,
+                    "Nem erre a sejtalkotóra gondoltunk!",
+                    `Tipp: keresd meg a(z) "${item.name}" nevű részt az ábrán vagy a számozott gombok között!`,
+                    () => {}
+                );
+            }
+        }
+
+        /* ==========================================
+           6. SZINT 3 LOGIKA: FOTOSZINTÉZIS GYÁR
+           ========================================== */
+        function loadLevel3() {
+            currentLevel = 3;
+            l3Phase = 1;
+            l3PickedInputs = [];
+            l3PickedOutputs = [];
+            showScreen('screen-level-3');
+            renderLevel3();
+        }
+
+        function renderLevel3() {
+            updateHUD();
+            const badge = document.getElementById('l3-step-badge');
+            const title = document.getElementById('l3-title');
+            const subtitle = document.getElementById('l3-subtitle');
+
+            if (l3Phase === 1) {
+                badge.textContent = "1. lépés / 2";
+                title.textContent = "1. Fázis: Mi szükséges a fotoszintézishez?";
+                subtitle.innerHTML = "Koppints arra a <strong>3 kiindulási tényezőre</strong>, amelyet a növény felvesz a környezetéből!";
+            } else {
+                badge.textContent = "2. lépés / 2";
+                title.textContent = "2. Fázis: Mi keletkezik a folyamatban?";
+                subtitle.innerHTML = "Szuper! Most válaszd ki azt a <strong>2 anyagot</strong>, amelyet a növény előállít a fotoszintézis során!";
+            }
+
+            // Bemeneti doboz frissítése
+            const inBox = document.getElementById('l3-inputs-box');
+            if (l3PickedInputs.length === 0) {
+                inBox.innerHTML = `<span class="text-xs text-slate-400 italic self-center">Válassz 3-at alulról...</span>`;
+            } else {
+                inBox.innerHTML = l3PickedInputs.map(item =>
+                    `<span class="bg-emerald-100 text-emerald-900 border border-emerald-300 text-xs font-extrabold px-2.5 py-1 rounded-lg">${item.icon} ${item.label}</span>`
+                ).join('');
+            }
+
+            // Kimeneti doboz frissítése
+            const outBox = document.getElementById('l3-outputs-box');
+            if (l3PickedOutputs.length === 0) {
+                outBox.innerHTML = `<span class="text-xs text-slate-400 italic self-center">${l3Phase === 1 ? '2. lépésben...' : 'Válassz 2-t alulról...'}</span>`;
+            } else {
+                outBox.innerHTML = l3PickedOutputs.map(item =>
+                    `<span class="bg-sky-100 text-sky-900 border border-sky-300 text-xs font-extrabold px-2.5 py-1 rounded-lg">${item.icon} ${item.label}</span>`
+                ).join('');
+            }
+
+            // Gombok kirajzolása
+            const choicesDiv = document.getElementById('l3-choices');
+            choicesDiv.innerHTML = '';
+
+            level3ChoicesData.forEach(item => {
+                const alreadyPicked = l3PickedInputs.some(x => x.id === item.id) || l3PickedOutputs.some(x => x.id === item.id);
+                const btn = document.createElement('button');
+                btn.disabled = alreadyPicked;
+                btn.className = `btn-game p-3 rounded-2xl border-2 font-extrabold text-xs sm:text-sm flex flex-col items-center gap-1 text-center ${
+                    alreadyPicked
+                        ? 'bg-slate-100 border-slate-200 text-slate-400 opacity-50'
+                        : 'bg-amber-50/70 hover:bg-amber-100 border-amber-200 text-slate-800'
+                }`;
+                btn.innerHTML = `<span class="text-2xl">${item.icon}</span><span>${item.label}</span>`;
+                btn.onclick = () => handleLevel3Pick(item);
+                choicesDiv.appendChild(btn);
+            });
+        }
+
+        function handleLevel3Pick(item) {
+            if (l3Phase === 1) {
+                if (item.role === 'input') {
+                    l3PickedInputs.push(item);
+                    score += 80;
+                    playSound('correct');
+                    renderLevel3();
+
+                    if (l3PickedInputs.length === 3) {
+                        showFeedback(
+                            true,
+                            "Mind a 3 bemenet megvan!",
+                            "A növény a gyökerén át vizet (H₂O), a levelein át szén-dioxidot (CO₂) vesz fel, a zöld színtest pedig befogja a napfény energiáját! Most jöhetnek a keletkező anyagok!",
+                            () => {
+                                l3Phase = 2;
+                                renderLevel3();
+                            }
+                        );
+                    }
+                } else {
+                    lives = Math.max(0, lives - 1);
+                    playSound('wrong');
+                    updateHUD();
+                    showFeedback(
+                        false,
+                        "Ez most nem kiindulási anyag!",
+                        item.explain,
+                        () => {}
+                    );
+                }
+            } else {
+                if (item.role === 'output') {
+                    l3PickedOutputs.push(item);
+                    score += 100;
+                    playSound('correct');
+                    renderLevel3();
+
+                    if (l3PickedOutputs.length === 2) {
+                        showFeedback(
+                            true,
+                            "A Fotoszintézis Gyár teljes gőzzel működik!",
+                            "A fotoszintézis egyenlete: Szén-dioxid + Víz + Fényenergia ➔ Szőlőcukor (szerves anyag) + Oxigén. Irány az utolsó szint!",
+                            () => {
+                                playSound('levelup');
+                                loadLevel4();
+                            }
+                        );
+                    }
+                } else {
+                    lives = Math.max(0, lives - 1);
+                    playSound('wrong');
+                    updateHUD();
+                    showFeedback(
+                        false,
+                        "Ez nem a fotoszintézis terméke!",
+                        item.explain,
+                        () => {}
+                    );
+                }
+            }
+        }
+
+        /* ==========================================
+           7. SZINT 4 LOGIKA: POPULÁCIÓ ÉS ÖKOLÓGIA
+           ========================================== */
+        function loadLevel4() {
+            currentLevel = 4;
+            stepIndex = 0;
+            showScreen('screen-level-4');
+            renderLevel4Step();
+        }
+
+        function renderLevel4Step() {
+            updateHUD();
+            const item = level4Data[stepIndex];
+            document.getElementById('l4-counter').textContent = `${stepIndex + 1} / ${level4Data.length}`;
+            document.getElementById('l4-question').textContent = item.question;
+
+            const optionsContainer = document.getElementById('l4-options');
+            optionsContainer.innerHTML = '';
+
+            // Opciók összekeverése index megőrzésével
+            const indexedOptions = item.options.map((text, idx) => ({ text, isCorrect: idx === item.correctIndex }));
+            indexedOptions.sort(() => Math.random() - 0.5);
+
+            indexedOptions.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = "btn-game w-full bg-purple-50 hover:bg-purple-100 border-2 border-purple-200 text-purple-950 font-extrabold text-sm sm:text-base p-3.5 rounded-2xl text-left leading-snug";
+                btn.textContent = opt.text;
+                btn.onclick = () => checkLevel4Answer(opt.isCorrect);
+                optionsContainer.appendChild(btn);
+            });
+        }
+
+        function checkLevel4Answer(isCorrect) {
+            const item = level4Data[stepIndex];
+            if (isCorrect) {
+                score += 150;
+                playSound('correct');
+            } else {
+                lives = Math.max(0, lives - 1);
+                playSound('wrong');
+            }
+            updateHUD();
+
+            showFeedback(
+                isCorrect,
+                isCorrect ? "Kiváló ökológiai meglátás! (+150 pont)" : "Tanuljunk belőle!",
+                item.explanation,
+                () => {
+                    stepIndex++;
+                    if (stepIndex < level4Data.length) {
+                        renderLevel4Step();
+                    } else {
+                        finishGame();
+                    }
+                }
+            );
+        }
+
+        /* ==========================================
+           8. JÁTÉK VÉGE ÉS ÉRTÉKELÉS
+           ========================================== */
+        function finishGame() {
+            playSound('levelup');
+            document.getElementById('hud-progress').style.width = "100%";
+            showScreen('screen-result');
+
+            const bonus = lives * 100;
+            const finalScore = score + bonus;
+
+            document.getElementById('result-score').textContent = finalScore;
+            document.getElementById('result-lives').textContent = lives > 0 ? "❤️".repeat(lives) : "💪";
+
+            const rankEl = document.getElementById('result-rank');
+            const emojiEl = document.getElementById('result-emoji');
+
+            if (finalScore >= 1600) {
+                emojiEl.textContent = "🏆";
+                rankEl.textContent = "Rang: Főbiológus Professzor";
+            } else if (finalScore >= 1100) {
+                emojiEl.textContent = "🥇";
+                rankEl.textContent = "Rang: Kutatólabor Vezető";
+            } else {
+                emojiEl.textContent = "🌱";
+                rankEl.textContent = "Rang: Lelkes Természetbúvár";
+            }
+        }
+    </script>
+</body>
+</html>
