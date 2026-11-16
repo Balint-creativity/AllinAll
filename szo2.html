@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Szókikérdező</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #121212;
+            color: #f8fafc;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        .btn-purple {
+            background-color: #bb86fc;
+            color: #121212;
+        }
+        
+        .btn-purple:hover {
+            background-color: #a370e0;
+        }
+        
+        .btn-purple:active {
+            background-color: #9159d4;
+        }
+        
+        .input-focus-effect:focus {
+            box-shadow: 0 0 0 4px rgba(187, 134, 252, 0.25);
+            border-color: #bb86fc !important;
+            outline: none;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Egyedi görgetősáv a hibák listájához */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e1e1e; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #374151; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4b5563; 
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-start pt-4 sm:pt-10 justify-center p-4">
+
+    <!-- Fő tartály -->
+    <div id="app-container" class="w-full max-w-md bg-[#1e1e1e] rounded-3xl shadow-2xl border border-gray-800 overflow-hidden flex flex-col min-h-[550px] max-h-[95vh]">
+        
+        <!-- ================= START KÉPERNYŐ ================= -->
+        <div id="start-screen" class="p-8 flex-1 flex flex-col justify-center items-center fade-in">
+            <div class="text-6xl mb-6">🎓</div>
+            <h1 class="text-3xl font-bold mb-8 text-[#bb86fc]">Szókikérdező</h1>
+            
+            <div class="w-full mb-10">
+                <label class="block text-gray-400 mb-3 font-medium text-center">Válaszd ki a teszt irányát:</label>
+                <div class="flex gap-3">
+                    <label class="flex-1 cursor-pointer">
+                        <input type="radio" name="direction" value="en-hu" class="peer sr-only" checked>
+                        <div class="p-3 text-center rounded-xl border-2 border-gray-700 bg-[#121212] peer-checked:border-[#bb86fc] peer-checked:text-[#bb86fc] transition-all font-medium">
+                            🇬🇧 ➡️ 🇭🇺<br><span class="text-xs text-gray-500 peer-checked:text-purple-400/70">Angolról Magyarra</span>
+                        </div>
+                    </label>
+                    <label class="flex-1 cursor-pointer">
+                        <input type="radio" name="direction" value="hu-en" class="peer sr-only">
+                        <div class="p-3 text-center rounded-xl border-2 border-gray-700 bg-[#121212] peer-checked:border-[#bb86fc] peer-checked:text-[#bb86fc] transition-all font-medium">
+                            🇭🇺 ➡️ 🇬🇧<br><span class="text-xs text-gray-500 peer-checked:text-purple-400/70">Magyarról Angolra</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+            
+            <button id="start-btn" class="w-full btn-purple font-bold py-4 rounded-xl shadow-lg transition-all text-lg mt-auto">
+                Indítás (10 szó)
+            </button>
+        </div>
+
+        <!-- ================= TESZT KÉPERNYŐ ================= -->
+        <div id="test-screen" class="hidden flex-1 flex flex-col fade-in">
+            
+            <!-- Fejléc -->
+            <div class="bg-gray-900/50 p-4 border-b border-gray-800 flex justify-between items-center">
+                <div class="text-sm font-medium text-gray-400">
+                    Kérdés: <span id="progress-text" class="text-white font-bold">1 / 10</span>
+                </div>
+                <div class="bg-gray-800 px-3 py-1 rounded-full text-sm font-bold flex items-center gap-2 text-[#bb86fc]">
+                    <span id="score-text">0 pont</span>
+                </div>
+            </div>
+
+            <!-- Játéktér -->
+            <div class="p-6 flex-1 flex flex-col justify-start relative mt-4">
+                
+                <div class="text-center mb-6">
+                    <p id="question-label" class="text-gray-400 text-xs mb-2 uppercase tracking-widest font-semibold">Mit jelent?</p>
+                    <h2 id="word-display" class="text-3xl sm:text-4xl font-bold text-[#bb86fc] tracking-tight uppercase break-words">alma</h2>
+                </div>
+
+                <!-- Segítő gombok MOZGATVA AZ INPUT ELÉ -->
+                <div class="flex gap-3 mb-6">
+                    <button type="button" id="hint-btn" class="flex-1 bg-gray-800 hover:bg-gray-700 active:bg-gray-900 text-gray-300 font-semibold py-3 rounded-xl transition-all text-sm border border-gray-700">
+                        💡 Segítség
+                    </button>
+                    <button type="button" id="dunno-btn" class="flex-1 bg-red-900/20 hover:bg-red-900/40 active:bg-red-900/60 text-red-400 font-semibold py-3 rounded-xl transition-all text-sm border border-red-900/50">
+                        🤷‍♂️ Nem tudom
+                    </button>
+                </div>
+
+                <form id="answer-form" class="flex flex-col w-full">
+                    <div class="mb-4 relative">
+                        <input 
+                            type="text" 
+                            id="answer-input" 
+                            class="w-full bg-[#121212] border border-gray-700 rounded-xl px-4 py-4 text-lg text-center font-medium placeholder-gray-600 input-focus-effect transition-all"
+                            placeholder="Írd be a fordítást..."
+                            autocomplete="off"
+                            autocorrect="off"
+                            autocapitalize="off"
+                            spellcheck="false"
+                        >
+                    </div>
+
+                    <!-- Visszajelzés -->
+                    <div id="feedback-container" class="hidden text-center mb-4 p-3 rounded-xl font-medium text-lg fade-in"></div>
+
+                    <button type="submit" id="check-btn" class="w-full btn-purple font-bold py-4 rounded-xl shadow-lg transition-all text-lg mt-2">
+                        Ellenőrzés
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- ================= EREDMÉNY KÉPERNYŐ ================= -->
+        <div id="result-screen" class="hidden flex-1 flex flex-col fade-in">
+            <div class="p-8 flex-1 flex flex-col">
+                <div class="text-center mb-6">
+                    <div class="text-5xl mb-3">🏁</div>
+                    <h2 class="text-2xl font-bold mb-1">Teszt vége!</h2>
+                    <p class="text-gray-400">Végső pontszámod:</p>
+                    <div class="text-4xl font-extrabold text-[#bb86fc] mt-2" id="final-score">8 / 10</div>
+                </div>
+                
+                <div id="wrong-words-container" class="hidden mb-6 flex-1 overflow-y-auto pr-2">
+                    <h3 class="text-gray-400 text-xs uppercase tracking-widest font-semibold mb-3 sticky top-0 bg-[#1e1e1e] pb-2">Ezeket kell még gyakorolni:</h3>
+                    <ul id="wrong-words-list" class="space-y-2">
+                        <!-- Hibás szavak listája -->
+                    </ul>
+                </div>
+                
+                <div id="perfect-score-msg" class="hidden text-center text-green-400 font-medium my-auto pb-6">
+                    Hibátlan lett, gratulálok! 🌟
+                </div>
+
+                <button id="restart-btn" class="w-full btn-purple font-bold py-4 rounded-xl shadow-lg transition-all text-lg mt-auto">
+                    Új teszt
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Bővített szótár a megadott 50+ szóval
+        const vocabulary = [
+            {en: "frontier", hu: "határ"}, {en: "trajectory", hu: "röppálya"}, {en: "strung out", hu: "kimerült, kikészült"}, 
+            {en: "tap", hu: "csap"}, {en: "scoop", hu: "gombóc"}, {en: "niggle", hu: "babrál"}, {en: "disclose", hu: "feltár"}, 
+            {en: "opt in", hu: "hozzájárulás"}, {en: "imminent", hu: "fenyegető, közelgő"}, {en: "savior", hu: "megmentő"}, 
+            {en: "thigh", hu: "comb"}, {en: "tight", hu: "szoros"}, {en: "comb", hu: "fésű"}, {en: "soot", hu: "korom"}, 
+            {en: "noble", hu: "nemes"}, {en: "tinder", hu: "tapló"}, {en: "lever", hu: "emelőkar"}, {en: "tether", hu: "póráz"}, 
+            {en: "jettison", hu: "kidobás"}, {en: "discrepancy", hu: "eltérés"}, {en: "restraint", hu: "korlátozás"}, 
+            {en: "wobbling", hu: "ingadozó"}, {en: "vaporize", hu: "párolog"}, {en: "blowback", hu: "visszafújás"}, 
+            {en: "breach", hu: "megszegés"}, {en: "apogee", hu: "tetőpont"}, {en: "ribbon", hu: "szalag"}, 
+            {en: "daunting", hu: "ijesztő"}, {en: "decisive", hu: "döntő"}, {en: "plunge", hu: "merülés"}, 
+            {en: "recurrence", hu: "ismétlődés"}, {en: "puke", hu: "hányás"}, {en: "suspend", hu: "felfüggeszt"}, 
+            {en: "breakfast", hu: "reggeli"}, {en: "hitch", hu: "rántás"}, {en: "quadruple", hu: "négyszeres"}, 
+            {en: "disposal", hu: "elhelyezés"}, {en: "shuffle", hu: "keverés, csoszogás"}, {en: "spool", hu: "cséve"}, 
+            {en: "otter", hu: "vidra"}, {en: "obesity", hu: "elhízottság"}, {en: "lineage", hu: "leszármazás"}, 
+            {en: "lull", hu: "szünet"}, {en: "outrage", hu: "merénylet, felháborodás"}, {en: "shrubland", hu: "cserjés"}, 
+            {en: "bolt", hu: "csavar"}, {en: "booze", hu: "nyakal, pia"}, {en: "slurry", hu: "iszap"}, 
+            {en: "scandal", hu: "botrány"}, {en: "engulf", hu: "elnyel"}, {en: "disguise", hu: "álca"}, 
+            {en: "embroider", hu: "hímez"}, {en: "superior force", hu: "túlerő"}
+        ];
+
+        // Állapot
+        let currentWords = [];
+        let currentIndex = 0;
+        let score = 0;
+        let direction = 'en-hu'; 
+        let wrongWords = [];
+        let isWaitingForNext = false; // Megakadályozza a dupla klikkeket auto-lapozás közben
+
+        // Képernyők
+        const startScreen = document.getElementById('start-screen');
+        const testScreen = document.getElementById('test-screen');
+        const resultScreen = document.getElementById('result-screen');
+        
+        // UI elemek
+        const startBtn = document.getElementById('start-btn');
+        const directionRadios = document.getElementsByName('direction');
+        
+        const answerForm = document.getElementById('answer-form');
+        const wordDisplay = document.getElementById('word-display');
+        const answerInput = document.getElementById('answer-input');
+        const checkBtn = document.getElementById('check-btn');
+        const hintBtn = document.getElementById('hint-btn');
+        const dunnoBtn = document.getElementById('dunno-btn');
+        const feedbackContainer = document.getElementById('feedback-container');
+        const progressText = document.getElementById('progress-text');
+        const scoreText = document.getElementById('score-text');
+        const questionLabel = document.getElementById('question-label');
+        
+        const finalScoreText = document.getElementById('final-score');
+        const wrongWordsContainer = document.getElementById('wrong-words-container');
+        const wrongWordsList = document.getElementById('wrong-words-list');
+        const perfectScoreMsg = document.getElementById('perfect-score-msg');
+        const restartBtn = document.getElementById('restart-btn');
+
+        // Tömb keverése (Fisher-Yates)
+        function shuffleArray(array) {
+            const newArr = [...array];
+            for (let i = newArr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [newArr[i], newArr[j]] = [newArr[j], newArr[i]];
+            }
+            return newArr;
+        }
+
+        // Teszt indítása
+        function startTest() {
+            // Irány kiolvasása
+            for (const radio of directionRadios) {
+                if (radio.checked) direction = radio.value;
+            }
+
+            const shuffled = shuffleArray(vocabulary);
+            currentWords = shuffled.slice(0, 10);
+            
+            currentIndex = 0;
+            score = 0;
+            wrongWords = [];
+            isWaitingForNext = false;
+            
+            startScreen.classList.add('hidden');
+            resultScreen.classList.add('hidden');
+            testScreen.classList.remove('hidden');
+            testScreen.classList.add('flex');
+            
+            questionLabel.textContent = direction === 'en-hu' ? 'Mit jelent magyarul?' : 'Mit jelent angolul?';
+            
+            updateScore();
+            loadWord();
+        }
+
+        // Aktuális szó betöltése
+        function loadWord() {
+            isWaitingForNext = false;
+            const word = currentWords[currentIndex];
+            
+            wordDisplay.textContent = direction === 'en-hu' ? word.en : word.hu;
+            progressText.textContent = `${currentIndex + 1} / ${currentWords.length}`;
+            
+            answerInput.value = '';
+            answerInput.disabled = false;
+            answerInput.classList.remove('border-red-500', 'border-green-500');
+            answerInput.classList.add('border-gray-700');
+            
+            feedbackContainer.classList.add('hidden');
+            
+            // Gombok engedélyezése
+            checkBtn.disabled = false;
+            hintBtn.disabled = false;
+            dunnoBtn.disabled = false;
+        }
+
+        // Várt válasz lekérése stringként
+        function getExpectedAnswer() {
+            const word = currentWords[currentIndex];
+            return direction === 'en-hu' ? word.hu : word.en;
+        }
+
+        // Találat ellenőrzése (Több vesszővel elválasztott jelentés támogatása)
+        function isCorrectMatch(userInput, expectedString) {
+            const input = userInput.toLowerCase();
+            const expected = expectedString.toLowerCase();
+            
+            // Ha pontosan beírta az egészet
+            if (input === expected) return true;
+            
+            // Ha vesszővel van elválasztva (pl "kimerült, kikészült") 
+            // elég az egyiket eltalálni
+            const parts = expected.split(',').map(s => s.trim());
+            return parts.includes(input);
+        }
+
+        // Válasz ellenőrzése
+        function checkAnswer() {
+            if (isWaitingForNext) return;
+            
+            // Billentyűzet automatikus elrejtése mobilon
+            answerInput.blur();
+            
+            const userVal = answerInput.value.trim();
+            if (!userVal) return; 
+            
+            const expected = getExpectedAnswer();
+            
+            if (isCorrectMatch(userVal, expected)) {
+                // HELYES
+                isWaitingForNext = true;
+                score++;
+                updateScore();
+                
+                showFeedback('Helyes! ✨', 'green');
+                answerInput.classList.replace('border-gray-700', 'border-green-500');
+                disableInputs();
+                
+                setTimeout(nextQuestion, 1200);
+            } else {
+                // HELYTELEN
+                showFeedback('Helytelen, próbáld újra!', 'red');
+                answerInput.classList.replace('border-gray-700', 'border-red-500');
+                
+                // Animáció reset, ha többször rontja el
+                feedbackContainer.classList.remove('fade-in');
+                void feedbackContainer.offsetWidth; // reflow trigger
+                feedbackContainer.classList.add('fade-in');
+                
+                answerInput.focus();
+            }
+        }
+
+        // Segítség (első két betű/szó bevitel)
+        function showHint() {
+            if (isWaitingForNext) return;
+            const expected = getExpectedAnswer();
+            // Ha rövid a szó, beírja, de kivágja a legelsőt. Vessző előtti részt vesszük.
+            const firstMeaning = expected.split(',')[0].trim();
+            const hintLength = Math.max(1, Math.min(2, firstMeaning.length));
+            answerInput.value = firstMeaning.substring(0, hintLength);
+            // Nem fókuszálunk automatikusan, hogy ne ugorjon fel a billentyűzet kéretlenül
+        }
+
+        // Feladás ("Nem tudom" gomb)
+        function giveUp() {
+            if (isWaitingForNext) return;
+            isWaitingForNext = true;
+            
+            // Billentyűzet elrejtése
+            answerInput.blur();
+            
+            const expected = getExpectedAnswer();
+            wrongWords.push(currentWords[currentIndex]);
+            
+            feedbackContainer.innerHTML = `A helyes válasz:<br><strong class="text-xl mt-1 block">${expected}</strong>`;
+            feedbackContainer.className = 'text-center mb-4 p-3 rounded-xl font-medium text-lg fade-in bg-red-900/40 text-red-400 border border-red-500/30';
+            feedbackContainer.classList.remove('hidden');
+            
+            answerInput.classList.replace('border-gray-700', 'border-red-500');
+            disableInputs();
+            
+            setTimeout(nextQuestion, 2500);
+        }
+
+        function disableInputs() {
+            answerInput.disabled = true;
+            checkBtn.disabled = true;
+            hintBtn.disabled = true;
+            dunnoBtn.disabled = true;
+        }
+
+        function showFeedback(text, type) {
+            feedbackContainer.classList.remove('hidden');
+            if (type === 'green') {
+                feedbackContainer.className = 'text-center mb-4 p-3 rounded-xl font-medium text-lg fade-in bg-green-900/40 text-green-400 border border-green-500/30';
+            } else {
+                feedbackContainer.className = 'text-center mb-4 p-3 rounded-xl font-medium text-lg fade-in bg-red-900/40 text-red-400 border border-red-500/30';
+            }
+            feedbackContainer.textContent = text;
+        }
+
+        function nextQuestion() {
+            currentIndex++;
+            if (currentIndex < currentWords.length) {
+                loadWord();
+            } else {
+                showResults();
+            }
+        }
+
+        function showResults() {
+            testScreen.classList.add('hidden');
+            testScreen.classList.remove('flex');
+            resultScreen.classList.remove('hidden');
+            resultScreen.classList.add('flex');
+            
+            finalScoreText.textContent = `${score} / ${currentWords.length}`;
+            
+            if (wrongWords.length > 0) {
+                perfectScoreMsg.classList.add('hidden');
+                wrongWordsContainer.classList.remove('hidden');
+                wrongWordsList.innerHTML = '';
+                
+                wrongWords.forEach(word => {
+                    const li = document.createElement('li');
+                    li.className = 'bg-[#121212] p-3 rounded-lg border border-gray-800 text-sm flex flex-col sm:flex-row sm:justify-between gap-1';
+                    
+                    const enSpan = document.createElement('span');
+                    enSpan.className = 'font-bold text-[#bb86fc]';
+                    enSpan.textContent = word.en;
+                    
+                    const huSpan = document.createElement('span');
+                    huSpan.className = 'text-gray-300';
+                    huSpan.textContent = word.hu;
+                    
+                    li.appendChild(enSpan);
+                    li.appendChild(huSpan);
+                    wrongWordsList.appendChild(li);
+                });
+            } else {
+                wrongWordsContainer.classList.add('hidden');
+                perfectScoreMsg.classList.remove('hidden');
+            }
+        }
+
+        function updateScore() {
+            scoreText.textContent = `${score} pont`;
+        }
+
+        function resetToStart() {
+            resultScreen.classList.add('hidden');
+            resultScreen.classList.remove('flex');
+            startScreen.classList.remove('hidden');
+            startScreen.classList.add('flex');
+        }
+
+        // Eseménykezelők
+        startBtn.addEventListener('click', startTest);
+        
+        answerForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            checkAnswer();
+        });
+        
+        hintBtn.addEventListener('click', showHint);
+        dunnoBtn.addEventListener('click', giveUp);
+        restartBtn.addEventListener('click', resetToStart);
+
+    </script>
+</body>
+</html>
